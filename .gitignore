@@ -2,3 +2,4 @@
 *.obj
 *.o
 .vscode
+bsc_parson_master/

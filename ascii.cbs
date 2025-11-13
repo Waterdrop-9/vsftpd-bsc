@@ -9,17 +9,20 @@
 
 #include "ascii.hbs"
 
-struct ascii_to_bin_ret
+unsafe struct ascii_to_bin_ret
 vsf_ascii_ascii_to_bin(char* p_buf, unsigned int in_len, int prev_cr)
 {
   /* Task: translate all \r\n into plain \n. A plain \r not followed by \n must
    * not be removed.
    */
-  struct ascii_to_bin_ret ret;
-  unsigned int indexx = 0;
-  unsigned int written = 0;
+  struct ascii_to_bin_ret ret = { 0, 0, 0 };
+  if (p_buf == 0)
+  {
+    return ret;
+  }
+  safe unsigned int indexx = 0;
+  safe unsigned int written = 0;
   char* p_out = p_buf + 1;
-  ret.last_was_cr = 0;
   if (prev_cr && (!in_len || p_out[0] != '\n'))
   {
     p_buf[0] = '\r';
@@ -53,7 +56,7 @@ vsf_ascii_ascii_to_bin(char* p_buf, unsigned int in_len, int prev_cr)
   return ret;
 }
 
-struct bin_to_ascii_ret
+unsafe struct bin_to_ascii_ret
 vsf_ascii_bin_to_ascii(const char* p_in,
                        char* p_out,
                        unsigned int in_len,
@@ -64,9 +67,13 @@ vsf_ascii_bin_to_ascii(const char* p_in,
    * but have switched to leaving it, like the more popular proftpd.
    */
   struct bin_to_ascii_ret ret = { 0, 0 };
-  unsigned int indexx = 0;
-  unsigned int written = 0;
-  char last_char = 0;
+  if (p_in == 0 || p_out == 0)
+  {
+    return ret;
+  }
+  safe unsigned int indexx = 0;
+  safe unsigned int written = 0;
+  safe char last_char = 0;
   if (prev_cr)
   {
     last_char = '\r';
@@ -96,4 +103,3 @@ vsf_ascii_bin_to_ascii(const char* p_in,
   ret.stored = written;
   return ret;
 }
-

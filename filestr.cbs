@@ -16,12 +16,16 @@
 #include "secbuf.hbs"
 #include "utility.hbs"
 
-int
+unsafe int
 str_fileread(struct mystr* p_str, const char* p_filename, unsigned int maxsize)
 {
-  int fd;
-  int retval = 0;
-  filesize_t size;
+  if (p_str == 0 || p_filename == 0)
+  {
+    return -1;
+  }
+  safe int fd = -1;
+  safe int retval = 0;
+  safe filesize_t size = 0;
   char* p_sec_buf = 0;
   struct vsf_sysutil_statbuf* p_stat = 0;
   /* In case we fail, make sure we return an empty string */
@@ -58,4 +62,3 @@ free_out:
   vsf_sysutil_close(fd);
   return retval;
 }
-

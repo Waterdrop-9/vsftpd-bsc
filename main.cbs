@@ -26,13 +26,13 @@
 /*
  * Forward decls of helper functions
  */
-static void die_unless_privileged(void);
-static void do_sanity_checks(void);
-static void session_init(struct vsf_session* p_sess);
-static void env_init(void);
-static void limits_init(void);
+unsafe static void die_unless_privileged(void);
+unsafe static void do_sanity_checks(void);
+unsafe static void session_init(struct vsf_session* p_sess);
+unsafe static void env_init(void);
+unsafe static void limits_init(void);
 
-int
+unsafe int
 main(int argc, const char* argv[])
 {
   struct vsf_session the_session =
@@ -69,7 +69,7 @@ main(int argc, const char* argv[])
     0
   };
   int config_loaded = 0;
-  int i;
+  safe int i = 0;
   tunables_load_defaults();
   /* This might need to open /dev/zero on systems lacking MAP_ANON. Needs
    * to be done early (i.e. before config file parse, which may use
@@ -82,6 +82,10 @@ main(int argc, const char* argv[])
    * config files.
    * If we see -v (version) or an unknown option, parsing bails and exits.
    */
+  if (argv == 0)
+  {
+    die("vsftpd: argv is NULL");
+  }
   if (argc == 0)
   {
     die("vsftpd: missing argv[0]");
@@ -256,7 +260,7 @@ main(int argc, const char* argv[])
   return 1;
 }
 
-static void
+unsafe static void
 die_unless_privileged(void)
 {
   if (!vsf_sysutil_running_as_root())
@@ -265,7 +269,7 @@ die_unless_privileged(void)
   }
 }
 
-static void
+unsafe static void
 do_sanity_checks(void)
 {
   {
@@ -302,7 +306,7 @@ do_sanity_checks(void)
   }
 }
 
-static void
+unsafe static void
 env_init(void)
 {
   vsf_sysutil_make_session_leader();
@@ -314,7 +318,7 @@ env_init(void)
   vsf_sysutil_install_null_sighandler(kVSFSysUtilSigPIPE);
 }
 
-static void
+unsafe static void
 limits_init(void)
 {
   unsigned long limit = VSFTP_AS_LIMIT;
@@ -328,9 +332,13 @@ limits_init(void)
   vsf_sysutil_set_address_space_limit(limit);
 }
 
-static void
+unsafe static void
 session_init(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    die("vsftpd: session_init received null session");
+  }
   /* Get the addresses of the control connection */
   vsf_sysutil_getpeername(VSFTP_COMMAND_FD, &p_sess->p_remote_addr);
   vsf_sysutil_getsockname(VSFTP_COMMAND_FD, &p_sess->p_local_addr);

@@ -5,7 +5,7 @@
  * PURPOSE
  * Load the default values into the global settings variables.
  */
-void tunables_load_defaults();
+unsafe void tunables_load_defaults(void);
 
 /* Configurable preferences */
 /* Booleans */
@@ -151,4 +151,3 @@ extern const char* tunable_ssl_sni_hostname;
 extern const char* tunable_cmds_denied;
 
 #endif /* VSF_TUNABLES_H */
-

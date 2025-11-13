@@ -12,12 +12,16 @@
 #include "utility.hbs"
 #include "sysdeputil.hbs"
 
-void
+unsafe void
 vsf_secutil_change_credentials(const struct mystr* p_user_str,
                                const struct mystr* p_dir_str,
                                const struct mystr* p_ext_dir_str,
                                unsigned int caps, unsigned int options)
 {
+  if (p_user_str == 0)
+  {
+    die("vsf_secutil_change_credentials: user is NULL");
+  }
   struct vsf_sysutil_user* p_user;
   if (!vsf_sysutil_running_as_root())
   {
@@ -141,4 +145,3 @@ vsf_secutil_change_credentials(const struct mystr* p_user_str,
     }
   }
 }
-

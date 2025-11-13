@@ -15,7 +15,7 @@
 #include "utility.hbs"
 #include "sysutil.hbs"
 
-int
+unsafe int
 str_netfd_alloc(struct vsf_session* p_sess,
                 struct mystr* p_str,
                 char term,
@@ -24,11 +24,16 @@ str_netfd_alloc(struct vsf_session* p_sess,
                 str_netfd_read_t p_peekfunc,
                 str_netfd_read_t p_readfunc)
 {
+  if (p_sess == 0 || p_str == 0 || p_readbuf == 0 ||
+      maxlen == 0 || p_peekfunc == 0 || p_readfunc == 0)
+  {
+    return -1;
+  }
   int retval;
-  unsigned int bytes_read;
-  unsigned int i;
+  safe unsigned int bytes_read = 0;
+  safe unsigned int i = 0;
   char* p_readpos = p_readbuf;
-  unsigned int left = maxlen;
+  safe unsigned int left = maxlen;
   str_empty(p_str);
   while (1)
   {
@@ -88,9 +93,13 @@ str_netfd_alloc(struct vsf_session* p_sess,
   } /* END: while(1) */
 }
 
-int
+unsafe int
 str_netfd_write(const struct mystr* p_str, int fd)
 {
+  if (p_str == 0)
+  {
+    return -1;
+  }
   int ret = 0;
   int retval;
   unsigned int str_len = str_getlen(p_str);
@@ -106,9 +115,18 @@ str_netfd_write(const struct mystr* p_str, int fd)
   return ret;
 }
 
-int
+unsafe int
 str_netfd_read(struct mystr* p_str, int fd, unsigned int len)
 {
+  if (p_str == 0)
+  {
+    return -1;
+  }
+  if (len == 0)
+  {
+    str_empty(p_str);
+    return 0;
+  }
   int retval;
   str_reserve(p_str, len);
   str_trunc(p_str, len);
@@ -119,4 +137,3 @@ str_netfd_read(struct mystr* p_str, int fd, unsigned int len)
   }
   return retval;
 }
-

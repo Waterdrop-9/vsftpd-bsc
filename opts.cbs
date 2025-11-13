@@ -11,9 +11,13 @@
 #include "ftpcmdio.hbs"
 #include "session.hbs"
 
-void
+unsafe void
 handle_opts(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   str_upper(&p_sess->ftp_arg_str);
   if (str_equal_text(&p_sess->ftp_arg_str, "UTF8 ON"))
   {
@@ -24,4 +28,3 @@ handle_opts(struct vsf_session* p_sess)
     vsf_cmdio_write(p_sess, FTP_BADOPTS, "Option not understood.");
   }
 }
-

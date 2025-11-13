@@ -20,9 +20,13 @@
 #include "sysdeputil.hbs"
 #include "session.hbs"
 
-void
+unsafe void
 priv_sock_init(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   struct vsf_sysutil_socketpair_retval retval;
   if (p_sess->parent_fd != -1)
   {
@@ -37,9 +41,13 @@ priv_sock_init(struct vsf_session* p_sess)
   p_sess->child_fd = retval.socket_two;
 }
 
-void
+unsafe void
 priv_sock_close(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   if (p_sess->parent_fd != -1)
   {
     vsf_sysutil_close(p_sess->parent_fd);
@@ -52,9 +60,13 @@ priv_sock_close(struct vsf_session* p_sess)
   }
 }
 
-void
+unsafe void
 priv_sock_set_parent_context(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   if (p_sess->child_fd == -1)
   {
     bug("child_fd not active");
@@ -63,9 +75,13 @@ priv_sock_set_parent_context(struct vsf_session* p_sess)
   p_sess->child_fd = -1;
 }
 
-void
+unsafe void
 priv_sock_set_child_context(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   if (p_sess->parent_fd == -1)
   {
     bug("parent_fd not active");
@@ -74,9 +90,13 @@ priv_sock_set_child_context(struct vsf_session* p_sess)
   p_sess->parent_fd = -1;
 }
 
-void
+unsafe void
 priv_sock_send_cmd(int fd, char cmd)
 {
+  if (fd < 0)
+  {
+    die("priv_sock_send_cmd invalid fd");
+  }
   int retval = vsf_sysutil_write_loop(fd, &cmd, sizeof(cmd));
   if (retval != sizeof(cmd))
   {
@@ -84,9 +104,13 @@ priv_sock_send_cmd(int fd, char cmd)
   }
 }
 
-void
+unsafe void
 priv_sock_send_str(int fd, const struct mystr* p_str)
 {
+  if (fd < 0 || p_str == 0)
+  {
+    die("priv_sock_send_str invalid args");
+  }
   unsigned int len = str_getlen(p_str);
   priv_sock_send_int(fd, (int) len);
   if (len > 0)
@@ -95,9 +119,13 @@ priv_sock_send_str(int fd, const struct mystr* p_str)
   }
 }
 
-void
+unsafe void
 priv_sock_send_buf(int fd, const char* p_buf, unsigned int len)
 {
+  if (fd < 0 || (p_buf == 0 && len > 0))
+  {
+    die("priv_sock_send_buf invalid args");
+  }
   priv_sock_send_int(fd, (int) len);
   if (len > 0)
   {
@@ -108,9 +136,13 @@ priv_sock_send_buf(int fd, const char* p_buf, unsigned int len)
   }
 }
 
-void
+unsafe void
 priv_sock_recv_buf(int fd, char* p_buf, unsigned int len)
 {
+  if (fd < 0 || p_buf == 0)
+  {
+    die("priv_sock_recv_buf invalid args");
+  }
   unsigned int recv_len = (unsigned int) priv_sock_get_int(fd);
   if (recv_len > len)
   {
@@ -125,9 +157,13 @@ priv_sock_recv_buf(int fd, char* p_buf, unsigned int len)
   }
 }
 
-char
+unsafe char
 priv_sock_get_result(int fd)
 {
+  if (fd < 0)
+  {
+    die("priv_sock_get_result invalid fd");
+  }
   char res;
   int retval = vsf_sysutil_read_loop(fd, &res, sizeof(res));
   if (retval != sizeof(res))
@@ -137,9 +173,13 @@ priv_sock_get_result(int fd)
   return res;
 }
 
-char
+unsafe char
 priv_sock_get_cmd(int fd)
 {
+  if (fd < 0)
+  {
+    die("priv_sock_get_cmd invalid fd");
+  }
   char res;
   int retval = vsf_sysutil_read_loop(fd, &res, sizeof(res));
   if (retval != sizeof(res))
@@ -149,9 +189,13 @@ priv_sock_get_cmd(int fd)
   return res;
 }
 
-void
+unsafe void
 priv_sock_get_str(int fd, struct mystr* p_dest)
 {
+  if (fd < 0 || p_dest == 0)
+  {
+    die("priv_sock_get_str invalid args");
+  }
   unsigned int len = (unsigned int) priv_sock_get_int(fd);
   if (len > VSFTP_PRIVSOCK_MAXSTR)
   {
@@ -168,9 +212,13 @@ priv_sock_get_str(int fd, struct mystr* p_dest)
   }
 }
 
-void
+unsafe void
 priv_sock_send_result(int fd, char res)
 {
+  if (fd < 0)
+  {
+    die("priv_sock_send_result invalid fd");
+  }
   int retval = vsf_sysutil_write_loop(fd, &res, sizeof(res));
   if (retval != sizeof(res))
   {
@@ -178,21 +226,33 @@ priv_sock_send_result(int fd, char res)
   }
 }
 
-void
+unsafe void
 priv_sock_send_fd(int fd, int send_fd)
 {
+  if (fd < 0 || send_fd < 0)
+  {
+    die("priv_sock_send_fd invalid fd");
+  }
   vsf_sysutil_send_fd(fd, send_fd);
 }
 
-int
+unsafe int
 priv_sock_recv_fd(int fd)
 {
+  if (fd < 0)
+  {
+    return -1;
+  }
   return vsf_sysutil_recv_fd(fd);
 }
 
-void
+unsafe void
 priv_sock_send_int(int fd, int the_int)
 {
+  if (fd < 0)
+  {
+    die("priv_sock_send_int invalid fd");
+  }
   int retval = vsf_sysutil_write_loop(fd, &the_int, sizeof(the_int));
   if (retval != sizeof(the_int))
   {
@@ -200,9 +260,13 @@ priv_sock_send_int(int fd, int the_int)
   }
 }
 
-int
+unsafe int
 priv_sock_get_int(int fd)
 {
+  if (fd < 0)
+  {
+    die("priv_sock_get_int invalid fd");
+  }
   int the_int;
   int retval = vsf_sysutil_read_loop(fd, &the_int, sizeof(the_int));
   if (retval != sizeof(the_int))
@@ -211,4 +275,3 @@ priv_sock_get_int(int fd)
   }
   return the_int;
 }
-

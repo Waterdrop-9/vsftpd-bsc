@@ -73,9 +73,13 @@ handle_sigterm(void* duff)
   vsf_sysutil_exit(1);
 }
 
-void
+unsafe void
 vsf_two_process_start(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    die("vsf_two_process_start: null session");
+  }
   vsf_sysutil_install_sighandler(kVSFSysUtilSigTERM, handle_sigterm, 0, 1);
   /* Overrides the SIGKILL setting set by the standalone listener. */
   vsf_set_term_if_parent_dies();
@@ -179,10 +183,14 @@ drop_all_privs(void)
   str_free(&dir_str);
 }
 
-void
+unsafe void
 vsf_two_process_login(struct vsf_session* p_sess,
                       const struct mystr* p_pass_str)
 {
+  if (p_sess == 0 || p_pass_str == 0)
+  {
+    die("vsf_two_process_login: invalid args");
+  }
   char result;
   priv_sock_send_cmd(p_sess->child_fd, PRIV_SOCK_LOGIN);
   priv_sock_send_str(p_sess->child_fd, &p_sess->user_str);
@@ -217,9 +225,13 @@ vsf_two_process_login(struct vsf_session* p_sess,
   }
 }
 
-int
+unsafe int
 vsf_two_process_get_priv_data_sock(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return -1;
+  }
   char res;
   unsigned short port = vsf_sysutil_sockaddr_get_port(p_sess->p_port_sockaddr);
   priv_sock_send_cmd(p_sess->child_fd, PRIV_SOCK_GET_DATA_SOCK);
@@ -236,9 +248,13 @@ vsf_two_process_get_priv_data_sock(struct vsf_session* p_sess)
   return priv_sock_recv_fd(p_sess->child_fd);
 }
 
-void
+unsafe void
 vsf_two_process_pasv_cleanup(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   char res;
   priv_sock_send_cmd(p_sess->child_fd, PRIV_SOCK_PASV_CLEANUP);
   res = priv_sock_get_result(p_sess->child_fd);
@@ -248,23 +264,35 @@ vsf_two_process_pasv_cleanup(struct vsf_session* p_sess)
   }
 }
 
-int
+unsafe int
 vsf_two_process_pasv_active(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return 0;
+  }
   priv_sock_send_cmd(p_sess->child_fd, PRIV_SOCK_PASV_ACTIVE);
   return priv_sock_get_int(p_sess->child_fd);
 }
 
-unsigned short
+unsafe unsigned short
 vsf_two_process_listen(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return 0;
+  }
   priv_sock_send_cmd(p_sess->child_fd, PRIV_SOCK_PASV_LISTEN);
   return (unsigned short) priv_sock_get_int(p_sess->child_fd);
 }
 
-int
+unsafe int
 vsf_two_process_get_pasv_fd(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return -1;
+  }
   char res;
   priv_sock_send_cmd(p_sess->child_fd, PRIV_SOCK_PASV_ACCEPT);
   res = priv_sock_get_result(p_sess->child_fd);
@@ -279,9 +307,13 @@ vsf_two_process_get_pasv_fd(struct vsf_session* p_sess)
   return priv_sock_recv_fd(p_sess->child_fd);
 }
 
-void
+unsafe void
 vsf_two_process_chown_upload(struct vsf_session* p_sess, int fd)
 {
+  if (p_sess == 0 || fd < 0)
+  {
+    die("vsf_two_process_chown_upload: invalid args");
+  }
   char res;
   priv_sock_send_cmd(p_sess->child_fd, PRIV_SOCK_CHOWN);
   priv_sock_send_fd(p_sess->child_fd, fd);
@@ -565,4 +597,3 @@ calculate_chdir_dir(int anon_login, struct mystr* p_userdir_str,
     }
   }
 }
-

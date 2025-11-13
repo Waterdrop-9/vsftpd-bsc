@@ -33,7 +33,7 @@ static void drop_ip_count(void* p_raw_addr);
 static unsigned int hash_ip(unsigned int buckets, void* p_key);
 static unsigned int hash_pid(unsigned int buckets, void* p_key);
 
-struct vsf_client_launch
+unsafe struct vsf_client_launch
 vsf_standalone_main(void)
 {
   struct vsf_sysutil_sockaddr* p_accept_addr = 0;
@@ -310,4 +310,3 @@ handle_ip_count(void* p_ipaddr)
   }
   return count;
 }
-

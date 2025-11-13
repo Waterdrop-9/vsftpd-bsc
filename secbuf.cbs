@@ -14,9 +14,19 @@
 #include "sysutil.hbs"
 #include "sysdeputil.hbs"
 
-void
+unsafe void
 vsf_secbuf_alloc(char** p_ptr, unsigned int size)
 {
+  if (p_ptr == 0)
+  {
+    return;
+  }
+  if (size == 0)
+  {
+    vsf_secbuf_free(p_ptr);
+    *p_ptr = 0;
+    return;
+  }
   unsigned int page_offset;
   unsigned int round_up;
   char* p_mmap;
@@ -61,9 +71,13 @@ vsf_secbuf_alloc(char** p_ptr, unsigned int size)
   *p_ptr = p_mmap;
 }
 
-void
+unsafe void
 vsf_secbuf_free(char** p_ptr)
 {
+  if (p_ptr == 0)
+  {
+    return;
+  }
   unsigned int map_size;
   unsigned long page_offset;
   char* p_mmap = *p_ptr;
@@ -72,6 +86,7 @@ vsf_secbuf_free(char** p_ptr)
   {
     return;
   }
+  *p_ptr = 0;
   /* Calculate the actual start of the mmap region */
   page_offset = (unsigned long) p_mmap % page_size;
   if (page_offset)
@@ -86,4 +101,3 @@ vsf_secbuf_free(char** p_ptr)
   /* Lose the mapping */
   vsf_sysutil_memunmap(p_mmap, map_size);
 }
-

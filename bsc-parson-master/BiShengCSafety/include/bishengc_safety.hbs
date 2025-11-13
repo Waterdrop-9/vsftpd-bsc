@@ -1,0 +1,37 @@
+#ifndef BISHENG_C_SAFETY_H
+#define BISHENG_C_SAFETY_H
+
+#include <stdlib.h>
+
+typedef void (*BSCBadAllocHandler)(size_t);
+typedef void (*BSCOutOfBoundHandler)(size_t, size_t);
+
+extern BSCBadAllocHandler bsc_bad_alloc_handler;
+extern BSCOutOfBoundHandler bsc_out_of_bound_handler;
+
+void default_bad_alloc_handler(size_t size);
+void default_out_of_bound_handler(size_t len, size_t index);
+void set_bsc_bad_alloc_handler(BSCBadAllocHandler handler);
+
+safe void safe_free(void * owned p);
+
+safe T *owned safe_malloc<T>(T t) {
+	unsafe {
+		T *addr = (T *)malloc(sizeof(T));
+		if (!addr) {
+			bsc_bad_alloc_handler(sizeof(T));
+		}
+		*addr = t;
+		return (T *owned)addr;
+	}
+}
+
+safe void safe_swap<T>(T* borrow left, T* borrow right) {
+	unsafe {
+		T tmp = *(T *)left;
+        *left = *(T *)right;
+        *right = tmp;
+	}
+}
+
+#endif

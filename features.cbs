@@ -12,9 +12,13 @@
 #include "ftpcmdio.hbs"
 #include "tunables.hbs"
 
-void
+unsafe void
 handle_feat(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   vsf_cmdio_write_hyphen(p_sess, FTP_FEAT, "Features:");
   if (tunable_ssl_enable)
   {
@@ -51,4 +55,3 @@ handle_feat(struct vsf_session* p_sess)
   vsf_cmdio_write_raw(p_sess, " UTF8\r\n");
   vsf_cmdio_write(p_sess, FTP_FEAT, "End");
 }
-

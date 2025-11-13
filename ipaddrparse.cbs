@@ -12,22 +12,26 @@
 #include "sysutil.hbs"
 #include "str.hbs"
 
-static int ipv6_parse_main(struct mystr* p_out_str,
-                           const struct mystr* p_in_str);
-static int ipv6_parse_hex(struct mystr* p_out_str,
-                          const struct mystr* p_in_str);
-static int ipv4_parse_dotquad(struct mystr* p_out_str,
-                              const struct mystr* p_in_str);
+unsafe static int ipv6_parse_main(struct mystr* p_out_str,
+                                  const struct mystr* p_in_str);
+unsafe static int ipv6_parse_hex(struct mystr* p_out_str,
+                                 const struct mystr* p_in_str);
+unsafe static int ipv4_parse_dotquad(struct mystr* p_out_str,
+                                     const struct mystr* p_in_str);
 
-const unsigned char*
+unsafe const unsigned char*
 vsf_sysutil_parse_ipv6(const struct mystr* p_str)
 {
+  if (p_str == 0)
+  {
+    return 0;
+  }
   static struct mystr s_ret;
   static struct mystr s_rhs_ret;
   static struct mystr s_lhs_str;
   static struct mystr s_rhs_str;
-  unsigned int lhs_len;
-  unsigned int rhs_len;
+  safe unsigned int lhs_len = 0;
+  safe unsigned int rhs_len = 0;
   str_empty(&s_ret);
   str_empty(&s_rhs_ret);
   str_copy(&s_lhs_str, p_str);
@@ -58,20 +62,28 @@ vsf_sysutil_parse_ipv6(const struct mystr* p_str)
   return (const unsigned char*) str_getbuf(&s_ret);
 }
 
-const unsigned char*
+unsafe const unsigned char*
 vsf_sysutil_parse_ipv4(const struct mystr* p_str)
 {
+  if (p_str == 0)
+  {
+    return 0;
+  }
   static unsigned char items[4];
   return vsf_sysutil_parse_uchar_string_sep(p_str, '.', items, sizeof(items));
 }
 
-const unsigned char*
+unsafe const unsigned char*
 vsf_sysutil_parse_uchar_string_sep(
   const struct mystr* p_str, char sep, unsigned char* p_items,
   unsigned int items)
 {
+  if (p_str == 0 || p_items == 0 || items == 0)
+  {
+    return 0;
+  }
   static struct mystr s_tmp_str;
-  unsigned int i;
+  safe unsigned int i = 0;
   str_copy(&s_tmp_str, p_str);
   for (i=0; i<items; i++)
   {
@@ -100,9 +112,13 @@ vsf_sysutil_parse_uchar_string_sep(
   return p_items;
 }
 
-static int
+unsafe static int
 ipv6_parse_main(struct mystr* p_out_str, const struct mystr* p_in_str)
 {
+  if (p_out_str == 0 || p_in_str == 0)
+  {
+    return 0;
+  }
   static struct mystr s_lhs_str;
   static struct mystr s_rhs_str;
   struct str_locate_result loc_ret;
@@ -131,9 +147,13 @@ ipv6_parse_main(struct mystr* p_out_str, const struct mystr* p_in_str)
   return 1;
 }
 
-static int
+unsafe static int
 ipv6_parse_hex(struct mystr* p_out_str, const struct mystr* p_in_str)
 {
+  if (p_out_str == 0 || p_in_str == 0)
+  {
+    return 0;
+  }
   unsigned int len = str_getlen(p_in_str);
   unsigned int i;
   unsigned int val = 0;
@@ -165,9 +185,13 @@ ipv6_parse_hex(struct mystr* p_out_str, const struct mystr* p_in_str)
   return 1;
 }
 
-static int
+unsafe static int
 ipv4_parse_dotquad(struct mystr* p_out_str, const struct mystr* p_in_str)
 {
+  if (p_out_str == 0 || p_in_str == 0)
+  {
+    return 0;
+  }
   unsigned int len = str_getlen(p_in_str);
   unsigned int i;
   unsigned int val = 0;
@@ -217,4 +241,3 @@ ipv4_parse_dotquad(struct mystr* p_out_str, const struct mystr* p_in_str)
   str_append_char(p_out_str, (final_val & 0xFF));
   return 1;
 }
-

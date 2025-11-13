@@ -31,30 +31,35 @@
 #include "readwrite.hbs"
 #include "privsock.hbs"
 
-static void init_data_sock_params(struct vsf_session* p_sess, int sock_fd);
-static filesize_t calc_num_send(int file_fd, filesize_t init_offset);
-static struct vsf_transfer_ret do_file_send_sendfile(
+unsafe static void init_data_sock_params(struct vsf_session* p_sess,
+                                         int sock_fd);
+unsafe static filesize_t calc_num_send(int file_fd, filesize_t init_offset);
+unsafe static struct vsf_transfer_ret do_file_send_sendfile(
   struct vsf_session* p_sess, int net_fd, int file_fd,
   filesize_t curr_file_offset, filesize_t bytes_to_send);
-static struct vsf_transfer_ret do_file_send_rwloop(
+unsafe static struct vsf_transfer_ret do_file_send_rwloop(
   struct vsf_session* p_sess, int file_fd, int is_ascii);
-static struct vsf_transfer_ret do_file_recv(
+unsafe static struct vsf_transfer_ret do_file_recv(
   struct vsf_session* p_sess, int file_fd, int is_ascii);
-static void handle_sigalrm(void* p_private);
-static void start_data_alarm(struct vsf_session* p_sess);
-static void handle_io(int retval, int fd, void* p_private);
-static int transfer_dir_internal(
+unsafe static void handle_sigalrm(void* p_private);
+unsafe static void start_data_alarm(struct vsf_session* p_sess);
+unsafe static void handle_io(int retval, int fd, void* p_private);
+unsafe static int transfer_dir_internal(
   struct vsf_session* p_sess, int is_control, struct vsf_sysutil_dir* p_dir,
   const struct mystr* p_base_dir_str, const struct mystr* p_option_str,
   const struct mystr* p_filter_str, int is_verbose);
-static int write_dir_list(struct vsf_session* p_sess,
-                          struct mystr_list* p_dir_list,
-                          enum EVSFRWTarget target);
-static unsigned int get_chunk_size();
+unsafe static int write_dir_list(struct vsf_session* p_sess,
+                                 struct mystr_list* p_dir_list,
+                                 enum EVSFRWTarget target);
+unsafe static unsigned int get_chunk_size();
 
-int
+unsafe int
 vsf_ftpdataio_dispose_transfer_fd(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return 0;
+  }
   int dispose_ret = 1;
   int retval;
   if (p_sess->data_fd == -1)
@@ -106,9 +111,13 @@ vsf_ftpdataio_dispose_transfer_fd(struct vsf_session* p_sess)
   return dispose_ret;
 }
 
-int
+unsafe int
 vsf_ftpdataio_get_pasv_fd(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return -1;
+  }
   int remote_fd;
   if (tunable_one_process_model)
   {
@@ -134,9 +143,13 @@ vsf_ftpdataio_get_pasv_fd(struct vsf_session* p_sess)
   return remote_fd;
 }
 
-int
+unsafe int
 vsf_ftpdataio_get_port_fd(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return -1;
+  }
   int remote_fd;
   if (tunable_one_process_model || tunable_port_promiscuous)
   {
@@ -156,9 +169,13 @@ vsf_ftpdataio_get_port_fd(struct vsf_session* p_sess)
   return remote_fd;
 }
 
-int
+unsafe int
 vsf_ftpdataio_post_mark_connect(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return 0;
+  }
   int ret = 0;
   if (!p_sess->data_use_ssl)
   {
@@ -192,10 +209,14 @@ vsf_ftpdataio_post_mark_connect(struct vsf_session* p_sess)
   return ret;
 }
 
-static void
+unsafe static void
 handle_sigalrm(void* p_private)
 {
   struct vsf_session* p_sess = (struct vsf_session*) p_private;
+  if (p_sess == 0)
+  {
+    return;
+  }
   if (!p_sess->data_progress)
   {
     p_sess->data_timeout = 1;
@@ -210,9 +231,13 @@ handle_sigalrm(void* p_private)
   }
 }
 
-void
+unsafe static void
 start_data_alarm(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   if (tunable_data_connection_timeout > 0)
   {
     vsf_sysutil_install_sighandler(kVSFSysUtilSigALRM,
@@ -227,9 +252,13 @@ start_data_alarm(struct vsf_session* p_sess)
   }
 }
 
-static void
+unsafe static void
 init_data_sock_params(struct vsf_session* p_sess, int sock_fd)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   if (p_sess->data_fd != -1)
   {
     bug("data descriptor still present in init_data_sock_params");
@@ -244,7 +273,7 @@ init_data_sock_params(struct vsf_session* p_sess, int sock_fd)
   start_data_alarm(p_sess);
 }
 
-static void
+unsafe static void
 handle_io(int retval, int fd, void* p_private)
 {
   long curr_sec;
@@ -254,6 +283,10 @@ handle_io(int retval, int fd, void* p_private)
   double pause_time;
   double rate_ratio;
   struct vsf_session* p_sess = (struct vsf_session*) p_private;
+  if (p_sess == 0)
+  {
+    return;
+  }
   if (p_sess->data_fd != fd || vsf_sysutil_retval_is_error(retval) ||
       retval == 0)
   {
@@ -291,7 +324,7 @@ handle_io(int retval, int fd, void* p_private)
   p_sess->bw_send_start_usec = vsf_sysutil_get_time_usec();
 }
 
-int
+unsafe int
 vsf_ftpdataio_transfer_dir(struct vsf_session* p_sess, int is_control,
                            struct vsf_sysutil_dir* p_dir,
                            const struct mystr* p_base_dir_str,
@@ -299,11 +332,28 @@ vsf_ftpdataio_transfer_dir(struct vsf_session* p_sess, int is_control,
                            const struct mystr* p_filter_str,
                            int is_verbose)
 {
+  if (p_sess == 0 || p_dir == 0)
+  {
+    return 0;
+  }
+  static const struct mystr s_empty = INIT_MYSTR;
+  if (p_base_dir_str == 0)
+  {
+    p_base_dir_str = &s_empty;
+  }
+  if (p_option_str == 0)
+  {
+    p_option_str = &s_empty;
+  }
+  if (p_filter_str == 0)
+  {
+    p_filter_str = &s_empty;
+  }
   return transfer_dir_internal(p_sess, is_control, p_dir, p_base_dir_str,
                                p_option_str, p_filter_str, is_verbose);
 }
 
-static int
+unsafe static int
 transfer_dir_internal(struct vsf_session* p_sess, int is_control,
                       struct vsf_sysutil_dir* p_dir,
                       const struct mystr* p_base_dir_str,
@@ -311,6 +361,10 @@ transfer_dir_internal(struct vsf_session* p_sess, int is_control,
                       const struct mystr* p_filter_str,
                       int is_verbose)
 {
+  if (p_sess == 0 || p_dir == 0)
+  {
+    return 0;
+  }
   struct mystr_list dir_list = INIT_STRLIST;
   struct mystr_list subdir_list = INIT_STRLIST;
   struct mystr dir_prefix_str = INIT_MYSTR;
@@ -402,10 +456,14 @@ transfer_dir_internal(struct vsf_session* p_sess, int is_control,
 }
 
 /* XXX - really, this should be refactored into a "buffered writer" object */
-static int
+unsafe static int
 write_dir_list(struct vsf_session* p_sess, struct mystr_list* p_dir_list,
                enum EVSFRWTarget target)
 {
+  if (p_sess == 0 || p_dir_list == 0)
+  {
+    return 1;
+  }
   /* This function writes out a list of strings to the client, over the
    * data socket. We now coalesce the strings into fewer write() syscalls,
    * which saved 33% CPU time writing a large directory.
@@ -437,10 +495,15 @@ write_dir_list(struct vsf_session* p_sess, struct mystr_list* p_dir_list,
   return retval;
 }
 
-struct vsf_transfer_ret
+unsafe struct vsf_transfer_ret
 vsf_ftpdataio_transfer_file(struct vsf_session* p_sess, int remote_fd,
                             int file_fd, int is_recv, int is_ascii)
 {
+  struct vsf_transfer_ret ret = { -1, 0 };
+  if (p_sess == 0)
+  {
+    return ret;
+  }
   if (!is_recv)
   {
     if (is_ascii || p_sess->data_use_ssl)
@@ -461,9 +524,14 @@ vsf_ftpdataio_transfer_file(struct vsf_session* p_sess, int remote_fd,
   }
 }
 
-static struct vsf_transfer_ret
+unsafe static struct vsf_transfer_ret
 do_file_send_rwloop(struct vsf_session* p_sess, int file_fd, int is_ascii)
 {
+  static const struct vsf_transfer_ret k_bad = { -2, 0 };
+  if (p_sess == 0)
+  {
+    return k_bad;
+  }
   static char* p_readbuf;
   static char* p_asciibuf;
   struct vsf_transfer_ret ret_struct = { 0, 0 };
@@ -531,10 +599,15 @@ do_file_send_rwloop(struct vsf_session* p_sess, int file_fd, int is_ascii)
   }
 }
 
-static struct vsf_transfer_ret
+unsafe static struct vsf_transfer_ret
 do_file_send_sendfile(struct vsf_session* p_sess, int net_fd, int file_fd,
                       filesize_t curr_file_offset, filesize_t bytes_to_send)
 {
+  static const struct vsf_transfer_ret k_bad = { -2, 0 };
+  if (p_sess == 0)
+  {
+    return k_bad;
+  }
   int retval;
   unsigned int chunk_size = 0;
   struct vsf_transfer_ret ret_struct = { 0, 0 };
@@ -562,7 +635,7 @@ do_file_send_sendfile(struct vsf_session* p_sess, int net_fd, int file_fd,
   return ret_struct; 
 }
 
-static filesize_t
+unsafe static filesize_t
 calc_num_send(int file_fd, filesize_t init_offset)
 {
   static struct vsf_sysutil_statbuf* s_p_statbuf;
@@ -586,9 +659,14 @@ calc_num_send(int file_fd, filesize_t init_offset)
   return bytes_to_send;
 }
 
-static struct vsf_transfer_ret
+unsafe static struct vsf_transfer_ret
 do_file_recv(struct vsf_session* p_sess, int file_fd, int is_ascii)
 {
+  static const struct vsf_transfer_ret k_bad = { -2, 0 };
+  if (p_sess == 0)
+  {
+    return k_bad;
+  }
   static char* p_recvbuf;
   unsigned int num_to_write;
   struct vsf_transfer_ret ret_struct = { 0, 0 };
@@ -641,7 +719,7 @@ do_file_recv(struct vsf_session* p_sess, int file_fd, int is_ascii)
   }
 }
 
-static unsigned int
+unsafe static unsigned int
 get_chunk_size()
 {
   unsigned int ret = VSFTP_DATA_BUFSIZE;
@@ -656,4 +734,3 @@ get_chunk_size()
   }
   return ret;
 }
-

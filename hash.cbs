@@ -29,13 +29,19 @@ struct hash
 };
 
 /* Internal functions */
-struct hash_node** hash_get_bucket(struct hash* p_hash, void* p_key);
-struct hash_node* hash_get_node_by_key(struct hash* p_hash, void* p_key);
+unsafe static struct hash_node** hash_get_bucket(struct hash* p_hash,
+                                                 void* p_key);
+unsafe static struct hash_node* hash_get_node_by_key(struct hash* p_hash,
+                                                     void* p_key);
 
-struct hash*
+unsafe struct hash*
 hash_alloc(unsigned int buckets, unsigned int key_size,
            unsigned int value_size, hashfunc_t hash_func)
 {
+  if (buckets == 0 || key_size == 0 || value_size == 0 || hash_func == 0)
+  {
+    return 0;
+  }
   unsigned int size;
   struct hash* p_hash = vsf_sysutil_malloc(sizeof(*p_hash));
   p_hash->buckets = buckets;
@@ -48,9 +54,13 @@ hash_alloc(unsigned int buckets, unsigned int key_size,
   return p_hash;
 }
 
-void*
+unsafe void*
 hash_lookup_entry(struct hash* p_hash, void* p_key)
 {
+  if (p_hash == 0 || p_key == 0)
+  {
+    return 0;
+  }
   struct hash_node* p_node = hash_get_node_by_key(p_hash, p_key);
   if (!p_node)
   {
@@ -59,9 +69,13 @@ hash_lookup_entry(struct hash* p_hash, void* p_key)
   return p_node->p_value;
 }
 
-void
+unsafe void
 hash_add_entry(struct hash* p_hash, void* p_key, void* p_value)
 {
+  if (p_hash == 0 || p_key == 0 || p_value == 0)
+  {
+    return;
+  }
   struct hash_node** p_bucket;
   struct hash_node* p_new_node;
   if (hash_lookup_entry(p_hash, p_key))
@@ -89,9 +103,13 @@ hash_add_entry(struct hash* p_hash, void* p_key, void* p_value)
   }
 }
 
-void
+unsafe void
 hash_free_entry(struct hash* p_hash, void* p_key)
 {
+  if (p_hash == 0 || p_key == 0)
+  {
+    return;
+  }
   struct hash_node* p_node = hash_get_node_by_key(p_hash, p_key);
   if (!p_node)
   {
@@ -117,9 +135,13 @@ hash_free_entry(struct hash* p_hash, void* p_key)
   vsf_sysutil_free(p_node);
 }
 
-struct hash_node**
+unsafe static struct hash_node**
 hash_get_bucket(struct hash* p_hash, void* p_key)
 {
+  if (p_hash == 0 || p_key == 0)
+  {
+    return 0;
+  }
   unsigned int bucket = (*p_hash->hash_func)(p_hash->buckets, p_key);
   if (bucket >= p_hash->buckets)
   {
@@ -128,10 +150,18 @@ hash_get_bucket(struct hash* p_hash, void* p_key)
   return &(p_hash->p_nodes[bucket]);
 }
 
-struct hash_node*
+unsafe static struct hash_node*
 hash_get_node_by_key(struct hash* p_hash, void* p_key)
 {
+  if (p_hash == 0 || p_key == 0)
+  {
+    return 0;
+  }
   struct hash_node** p_bucket = hash_get_bucket(p_hash, p_key);
+  if (p_bucket == 0)
+  {
+    return 0;
+  }
   struct hash_node* p_node = *p_bucket;
   if (!p_node)
   {
@@ -144,4 +174,3 @@ hash_get_node_by_key(struct hash* p_hash, void* p_key)
   }
   return p_node;
 }
-

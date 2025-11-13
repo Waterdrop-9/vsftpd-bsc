@@ -23,9 +23,13 @@
 #define VSFTP_MAX_VISIT_REMEMBER 100
 #define VSFTP_MAX_MSGFILE_SIZE 4000
 
-void
+unsafe void
 vsf_banner_dir_changed(struct vsf_session* p_sess, int ftpcode)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   struct mystr dir_str = INIT_MYSTR;
   /* Do nothing if .message support is off */
   if (!tunable_dirmessage_enable)
@@ -65,11 +69,15 @@ vsf_banner_dir_changed(struct vsf_session* p_sess, int ftpcode)
   str_free(&dir_str);
 }
 
-void
+unsafe void
 vsf_banner_write(struct vsf_session* p_sess, struct mystr* p_str, int ftpcode)
 {
+  if (p_sess == 0 || p_str == 0)
+  {
+    return;
+  }
   struct mystr msg_line_str = INIT_MYSTR;
-  unsigned int str_pos = 0;
+  safe unsigned int str_pos = 0;
   while (str_getline(p_str, &msg_line_str, &str_pos))
   {
     vsf_cmdio_write_str_hyphen(p_sess, ftpcode, &msg_line_str);

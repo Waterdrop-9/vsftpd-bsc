@@ -16,12 +16,12 @@
 #include "sysutil.hbs"
 #include "tunables.hbs"
 
-static void build_dir_line(struct mystr* p_str,
-                           const struct mystr* p_filename_str,
-                           const struct vsf_sysutil_statbuf* p_stat,
-                           long curr_time);
+unsafe static void build_dir_line(struct mystr* p_str,
+                                  const struct mystr* p_filename_str,
+                                  const struct vsf_sysutil_statbuf* p_stat,
+                                  long curr_time);
 
-void
+unsafe void
 vsf_ls_populate_dir_list(struct mystr_list* p_list,
                          struct mystr_list* p_subdir_list,
                          struct vsf_sysutil_dir* p_dir,
@@ -30,6 +30,17 @@ vsf_ls_populate_dir_list(struct mystr_list* p_list,
                          const struct mystr* p_filter_str,
                          int is_verbose)
 {
+  if (p_list == 0 || p_dir == 0)
+  {
+    return;
+  }
+  static struct mystr s_empty_str = INIT_MYSTR;
+  const struct mystr* base_dir_str =
+    (p_base_dir_str != 0) ? p_base_dir_str : &s_empty_str;
+  const struct mystr* option_str =
+    (p_option_str != 0) ? p_option_str : &s_empty_str;
+  const struct mystr* filter_str =
+    (p_filter_str != 0) ? p_filter_str : &s_empty_str;
   struct mystr dirline_str = INIT_MYSTR;
   struct mystr normalised_base_dir_str = INIT_MYSTR;
   struct str_locate_result loc_result;
@@ -39,15 +50,15 @@ vsf_ls_populate_dir_list(struct mystr_list* p_list,
   int F_option;
   int do_stat = 0;
   long curr_time = 0;
-  loc_result = str_locate_char(p_option_str, 'a');
+  loc_result = str_locate_char(option_str, 'a');
   a_option = loc_result.found;
-  loc_result = str_locate_char(p_option_str, 'r');
+  loc_result = str_locate_char(option_str, 'r');
   r_option = loc_result.found;
-  loc_result = str_locate_char(p_option_str, 't');
+  loc_result = str_locate_char(option_str, 't');
   t_option = loc_result.found;
-  loc_result = str_locate_char(p_option_str, 'F');
+  loc_result = str_locate_char(option_str, 'F');
   F_option = loc_result.found;
-  loc_result = str_locate_char(p_option_str, 'l');
+  loc_result = str_locate_char(option_str, 'l');
   if (loc_result.found)
   {
     is_verbose = 1;
@@ -62,16 +73,16 @@ vsf_ls_populate_dir_list(struct mystr_list* p_list,
     do_stat = 1;
   }
   /* If the filter starts with a . then implicitly enable -a */
-  if (!str_isempty(p_filter_str) && str_get_char_at(p_filter_str, 0) == '.')
+  if (!str_isempty(filter_str) && str_get_char_at(filter_str, 0) == '.')
   {
     a_option = 1;
   }
   /* "Normalise" the incoming base directory string by making sure it
    * ends in a '/' if it is nonempty
    */
-  if (!str_equal_text(p_base_dir_str, "."))
+  if (!str_equal_text(base_dir_str, "."))
   {
-    str_copy(&normalised_base_dir_str, p_base_dir_str);
+    str_copy(&normalised_base_dir_str, base_dir_str);
   }
   if (!str_isempty(&normalised_base_dir_str))
   {
@@ -118,10 +129,10 @@ vsf_ls_populate_dir_list(struct mystr_list* p_list,
       continue;
     }
     /* If we have an ls option which is a filter, apply it */
-    if (!str_isempty(p_filter_str))
+    if (!str_isempty(filter_str))
     {
-      unsigned int iters = 0;
-      if (!vsf_filename_passes_filter(&s_next_filename_str, p_filter_str,
+      safe unsigned int iters = 0;
+      if (!vsf_filename_passes_filter(&s_next_filename_str, filter_str,
                                       &iters))
       {
         continue;
@@ -219,11 +230,15 @@ vsf_ls_populate_dir_list(struct mystr_list* p_list,
   str_free(&normalised_base_dir_str);
 }
 
-int
+unsafe int
 vsf_filename_passes_filter(const struct mystr* p_filename_str,
                            const struct mystr* p_filter_str,
                            unsigned int* iters)
 {
+  if (p_filename_str == 0 || p_filter_str == 0 || iters == 0)
+  {
+    return 0;
+  }
   /* A simple routine to match a filename against a pattern.
    * This routine is used instead of e.g. fnmatch(3), because we should be
    * reluctant to trust the latter. fnmatch(3) involves _lots_ of string
@@ -368,10 +383,14 @@ out:
   return ret;
 }
 
-static void
+unsafe static void
 build_dir_line(struct mystr* p_str, const struct mystr* p_filename_str,
                const struct vsf_sysutil_statbuf* p_stat, long curr_time)
 {
+  if (p_str == 0 || p_filename_str == 0 || p_stat == 0)
+  {
+    return;
+  }
   static struct mystr s_tmp_str;
   filesize_t size = vsf_sysutil_statbuf_get_size(p_stat);
   /* Permissions */
@@ -446,4 +465,3 @@ build_dir_line(struct mystr* p_str, const struct mystr* p_filename_str,
   str_append_str(p_str, p_filename_str);
   str_append_text(p_str, "\r\n");
 }
-

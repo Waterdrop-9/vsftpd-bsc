@@ -149,8 +149,8 @@ const char* tunable_ssl_sni_hostname;
 
 static void install_str_setting(const char* p_value, const char** p_storage);
 
-void
-tunables_load_defaults()
+unsafe void
+tunables_load_defaults(void)
 {
   tunable_anonymous_enable = 1;
   tunable_local_enable = 0;

@@ -23,18 +23,22 @@
 #include "sysdeputil.hbs"
 #include "seccompsandbox.hbs"
 
-static void minimize_privilege(struct vsf_session* p_sess);
-static void process_post_login_req(struct vsf_session* p_sess);
-static void cmd_process_chown(struct vsf_session* p_sess);
-static void cmd_process_get_data_sock(struct vsf_session* p_sess);
-static void cmd_process_pasv_cleanup(struct vsf_session* p_sess);
-static void cmd_process_pasv_active(struct vsf_session* p_sess);
-static void cmd_process_pasv_listen(struct vsf_session* p_sess);
-static void cmd_process_pasv_accept(struct vsf_session* p_sess);
+unsafe static void minimize_privilege(struct vsf_session* p_sess);
+unsafe static void process_post_login_req(struct vsf_session* p_sess);
+unsafe static void cmd_process_chown(struct vsf_session* p_sess);
+unsafe static void cmd_process_get_data_sock(struct vsf_session* p_sess);
+unsafe static void cmd_process_pasv_cleanup(struct vsf_session* p_sess);
+unsafe static void cmd_process_pasv_active(struct vsf_session* p_sess);
+unsafe static void cmd_process_pasv_listen(struct vsf_session* p_sess);
+unsafe static void cmd_process_pasv_accept(struct vsf_session* p_sess);
 
-void
+unsafe void
 vsf_priv_parent_postlogin(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   minimize_privilege(p_sess);
   /* We're still here... */
   while (1)
@@ -43,9 +47,13 @@ vsf_priv_parent_postlogin(struct vsf_session* p_sess)
   }
 }
 
-static void
+unsafe static void
 process_post_login_req(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    die("null session in process_post_login_req");
+  }
   char cmd;
   /* Blocks */
   cmd = priv_sock_get_cmd(p_sess->parent_fd);
@@ -79,9 +87,13 @@ process_post_login_req(struct vsf_session* p_sess)
   }
 }
 
-static void
+unsafe static void
 minimize_privilege(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   /* So, we logged in and forked a totally unprivileged child. Our job
    * now is to minimize the privilege we need in order to act as a helper
    * to the child.
@@ -122,18 +134,26 @@ minimize_privilege(struct vsf_session* p_sess)
   seccomp_sandbox_lockdown();
 }
 
-static void
+unsafe static void
 cmd_process_chown(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   int the_fd = priv_sock_recv_fd(p_sess->parent_fd);
   vsf_privop_do_file_chown(p_sess, the_fd);
   vsf_sysutil_close(the_fd);
   priv_sock_send_result(p_sess->parent_fd, PRIV_SOCK_RESULT_OK);
 }
 
-static void
+unsafe static void
 cmd_process_get_data_sock(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   unsigned short port = (unsigned short) priv_sock_get_int(p_sess->parent_fd);
   int sock_fd = vsf_privop_get_ftp_port_sock(p_sess, port, 0);
   if (sock_fd == -1)
@@ -146,30 +166,46 @@ cmd_process_get_data_sock(struct vsf_session* p_sess)
   vsf_sysutil_close(sock_fd);
 }
 
-static void
+unsafe static void
 cmd_process_pasv_cleanup(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   vsf_privop_pasv_cleanup(p_sess);
   priv_sock_send_result(p_sess->parent_fd, PRIV_SOCK_RESULT_OK);
 }
 
-static void
+unsafe static void
 cmd_process_pasv_active(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   int active = vsf_privop_pasv_active(p_sess);
   priv_sock_send_int(p_sess->parent_fd, active);
 }
 
-static void
+unsafe static void
 cmd_process_pasv_listen(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   unsigned short port = vsf_privop_pasv_listen(p_sess);
   priv_sock_send_int(p_sess->parent_fd, port);
 }
 
-static void
+unsafe static void
 cmd_process_pasv_accept(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   int fd = vsf_privop_accept_pasv(p_sess);
   if (fd < 0)
   {
@@ -181,4 +217,3 @@ cmd_process_pasv_accept(struct vsf_session* p_sess)
   priv_sock_send_fd(p_sess->parent_fd, fd);
   vsf_sysutil_close(fd);
 }
-

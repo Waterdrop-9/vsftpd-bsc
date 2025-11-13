@@ -21,14 +21,18 @@
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 
-static int socket_validator(struct pt_sandbox* p_sandbox, void* p_arg);
-static int connect_validator(struct pt_sandbox* p_sandbox, void* p_arg);
-static int getsockopt_validator(struct pt_sandbox* p_sandbox, void* p_arg);
-static int setsockopt_validator(struct pt_sandbox* p_sandbox, void* p_arg);
+unsafe static int socket_validator(struct pt_sandbox* p_sandbox, void* p_arg);
+unsafe static int connect_validator(struct pt_sandbox* p_sandbox, void* p_arg);
+unsafe static int getsockopt_validator(struct pt_sandbox* p_sandbox, void* p_arg);
+unsafe static int setsockopt_validator(struct pt_sandbox* p_sandbox, void* p_arg);
 
-void
+unsafe void
 policy_setup(struct pt_sandbox* p_sandbox, const struct vsf_session* p_sess)
 {
+  if (p_sandbox == 0 || p_sess == 0)
+  {
+    return;
+  }
   int is_anon = p_sess->is_anonymous;
   /* Always need to be able to exit! */
   ptrace_sandbox_permit_exit(p_sandbox);
@@ -157,14 +161,18 @@ policy_setup(struct pt_sandbox* p_sandbox, const struct vsf_session* p_sess)
   }
 }
 
-static int
+unsafe static int
 socket_validator(struct pt_sandbox* p_sandbox, void* p_arg)
 {
-  int ret;
-  struct vsf_session* p_sess = (struct vsf_session*) p_arg;
-  unsigned long arg1;
-  unsigned long arg2;
-  unsigned long expected_family = AF_INET;
+  if (p_sandbox == 0 || p_arg == 0)
+  {
+    return -1;
+  }
+  safe int ret = 0;
+  const struct vsf_session* p_sess = (const struct vsf_session*) p_arg;
+  safe unsigned long arg1 = 0;
+  safe unsigned long arg2 = 0;
+  safe unsigned long expected_family = AF_INET;
   if (vsf_sysutil_sockaddr_is_ipv6(p_sess->p_local_addr))
   {
     expected_family = AF_INET6;
@@ -186,17 +194,21 @@ socket_validator(struct pt_sandbox* p_sandbox, void* p_arg)
   return 0;
 }
 
-static int
+unsafe static int
 connect_validator(struct pt_sandbox* p_sandbox, void* p_arg)
 {
-  int ret;
-  struct vsf_session* p_sess = (struct vsf_session*) p_arg;
-  unsigned long arg2;
-  unsigned long arg3;
-  unsigned long expected_family = AF_INET;
-  unsigned long expected_len = sizeof(struct sockaddr_in);
-  void* p_buf = 0;
-  struct sockaddr* p_sockaddr;
+  if (p_sandbox == 0 || p_arg == 0)
+  {
+    return -1;
+  }
+  safe int ret = 0;
+  const struct vsf_session* p_sess = (const struct vsf_session*) p_arg;
+  safe unsigned long arg2 = 0;
+  safe unsigned long arg3 = 0;
+  safe unsigned long expected_family = AF_INET;
+  safe unsigned long expected_len = sizeof(struct sockaddr_in);
+  char* p_buf = 0;
+  struct sockaddr* p_sockaddr = 0;
   static struct vsf_sysutil_sockaddr* p_sockptr;
   if (vsf_sysutil_sockaddr_is_ipv6(p_sess->p_local_addr))
   {
@@ -255,12 +267,16 @@ connect_validator(struct pt_sandbox* p_sandbox, void* p_arg)
   return 0;
 }
 
-static int
+unsafe static int
 getsockopt_validator(struct pt_sandbox* p_sandbox, void* p_arg)
 {
-  int ret;
-  unsigned long arg2;
-  unsigned long arg3;
+  if (p_sandbox == 0)
+  {
+    return -1;
+  }
+  safe int ret = 0;
+  safe unsigned long arg2 = 0;
+  safe unsigned long arg3 = 0;
   (void) p_arg;
   ret = ptrace_sandbox_get_socketcall_arg(p_sandbox, 1, &arg2);
   if (ret != 0)
@@ -279,12 +295,16 @@ getsockopt_validator(struct pt_sandbox* p_sandbox, void* p_arg)
   return 0;
 }
 
-static int
+unsafe static int
 setsockopt_validator(struct pt_sandbox* p_sandbox, void* p_arg)
 {
-  int ret;
-  unsigned long arg2;
-  unsigned long arg3;
+  if (p_sandbox == 0)
+  {
+    return -1;
+  }
+  safe int ret = 0;
+  safe unsigned long arg2 = 0;
+  safe unsigned long arg3 = 0;
   (void) p_arg;
   ret = ptrace_sandbox_get_socketcall_arg(p_sandbox, 1, &arg2);
   if (ret != 0)

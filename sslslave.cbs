@@ -16,9 +16,13 @@
 #include "readwrite.hbs"
 #include "defs.hbs"
 
-void
+unsafe void
 ssl_slave(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    die("ssl_slave: null session");
+  }
   struct mystr data_str = INIT_MYSTR;
   str_reserve(&data_str, VSFTP_DATA_BUFSIZE);
   /* Before becoming the slave, clear the alarm for the FTP protocol. */

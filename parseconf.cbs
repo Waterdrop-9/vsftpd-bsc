@@ -186,7 +186,7 @@ parseconf_str_array[] =
   { 0, 0 }
 };
 
-void
+unsafe void
 vsf_parseconf_load_file(const char* p_filename, int errs_fatal)
 {
   struct mystr config_file_str = INIT_MYSTR;
@@ -253,11 +253,19 @@ vsf_parseconf_load_file(const char* p_filename, int errs_fatal)
   str_free(&config_value_str);
 }
 
-void
+unsafe void
 vsf_parseconf_load_setting(const char* p_setting, int errs_fatal)
 {
   static struct mystr s_setting_str;
   static struct mystr s_value_str;
+  if (p_setting == 0)
+  {
+    if (errs_fatal)
+    {
+      die("null config setting");
+    }
+    return;
+  }
   while (vsf_sysutil_isspace(*p_setting))
   {
     p_setting++;

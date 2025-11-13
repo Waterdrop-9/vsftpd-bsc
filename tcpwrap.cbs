@@ -23,9 +23,13 @@
 int deny_severity = LOG_WARNING;
 int allow_severity = LOG_INFO;
 
-int
+unsafe int
 vsf_tcp_wrapper_ok(int remote_fd)
 {
+  if (remote_fd < 0)
+  {
+    return 0;
+  }
   struct request_info req;
   vsf_sysutil_openlog(0);
   request_init(&req, RQ_DAEMON, "vsftpd", RQ_FILE, remote_fd, 0);
@@ -41,7 +45,7 @@ vsf_tcp_wrapper_ok(int remote_fd)
 
 #else /* VSF_BUILD_TCPWRAPPERS */
 
-int
+unsafe int
 vsf_tcp_wrapper_ok(int remote_fd)
 {
   (void) remote_fd;
@@ -50,4 +54,3 @@ vsf_tcp_wrapper_ok(int remote_fd)
 }
 
 #endif /* VSF_BUILD_TCPWRAPPERS */
-

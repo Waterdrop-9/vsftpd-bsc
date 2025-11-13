@@ -16,9 +16,13 @@
 #include "utility.hbs"
 #include "tunables.hbs"
 
-void
+unsafe void
 str_getcwd(struct mystr* p_str)
 {
+  if (p_str == 0)
+  {
+    return;
+  }
   static char* p_getcwd_buf;
   char* p_ret;
   if (p_getcwd_buf == 0)
@@ -34,46 +38,74 @@ str_getcwd(struct mystr* p_str)
   }
 }
 
-int
+unsafe int
 str_write_loop(const struct mystr* p_str, const int fd)
 {
+  if (p_str == 0)
+  {
+    return -1;
+  }
   return vsf_sysutil_write_loop(fd, str_getbuf(p_str), str_getlen(p_str));
 }
 
-int
+unsafe int
 str_read_loop(struct mystr* p_str, const int fd)
 {
+  if (p_str == 0)
+  {
+    return -1;
+  }
   return vsf_sysutil_read_loop(
     fd, (char*) str_getbuf(p_str), str_getlen(p_str));
 }
 
-int
+unsafe int
 str_mkdir(const struct mystr* p_str, const unsigned int mode)
 {
+  if (p_str == 0)
+  {
+    return -1;
+  }
   return vsf_sysutil_mkdir(str_getbuf(p_str), mode);
 }
 
-int
+unsafe int
 str_rmdir(const struct mystr* p_str)
 {
+  if (p_str == 0)
+  {
+    return -1;
+  }
   return vsf_sysutil_rmdir(str_getbuf(p_str));
 }
 
-int
+unsafe int
 str_unlink(const struct mystr* p_str)
 {
+  if (p_str == 0)
+  {
+    return -1;
+  }
   return vsf_sysutil_unlink(str_getbuf(p_str));
 }
 
-int
+unsafe int
 str_chdir(const struct mystr* p_str)
 {
+  if (p_str == 0)
+  {
+    return -1;
+  }
   return vsf_sysutil_chdir(str_getbuf(p_str));
 }
 
-int
+unsafe int
 str_open(const struct mystr* p_str, const enum EVSFSysStrOpenMode mode)
 {
+  if (p_str == 0)
+  {
+    return -1;
+  }
   enum EVSFSysUtilOpenMode open_mode = kVSFSysUtilOpenUnknown;
   switch (mode)
   {
@@ -89,52 +121,84 @@ str_open(const struct mystr* p_str, const enum EVSFSysStrOpenMode mode)
   return vsf_sysutil_open_file(str_getbuf(p_str), open_mode);
 }
 
-int
+unsafe int
 str_stat(const struct mystr* p_str, struct vsf_sysutil_statbuf** p_ptr)
 {
+  if (p_str == 0 || p_ptr == 0)
+  {
+    return -1;
+  }
   return vsf_sysutil_stat(str_getbuf(p_str), p_ptr);
 }
 
-int
+unsafe int
 str_lstat(const struct mystr* p_str, struct vsf_sysutil_statbuf** p_ptr)
 {
+  if (p_str == 0 || p_ptr == 0)
+  {
+    return -1;
+  }
   return vsf_sysutil_lstat(str_getbuf(p_str), p_ptr);
 }
 
-int
+unsafe int
 str_create_exclusive(const struct mystr* p_str)
 {
+  if (p_str == 0)
+  {
+    return -1;
+  }
   return vsf_sysutil_create_file_exclusive(str_getbuf(p_str));
 }
 
-int
+unsafe int
 str_create(const struct mystr* p_str)
 {
+  if (p_str == 0)
+  {
+    return -1;
+  }
   return vsf_sysutil_create_or_open_file(
       str_getbuf(p_str), tunable_file_open_mode);
 }
 
-int
+unsafe int
 str_chmod(const struct mystr* p_str, unsigned int mode)
 {
+  if (p_str == 0)
+  {
+    return -1;
+  }
   return vsf_sysutil_chmod(str_getbuf(p_str), mode);
 }
 
-int
+unsafe int
 str_rename(const struct mystr* p_from_str, const struct mystr* p_to_str)
 {
+  if (p_from_str == 0 || p_to_str == 0)
+  {
+    return -1;
+  }
   return vsf_sysutil_rename(str_getbuf(p_from_str), str_getbuf(p_to_str));
 }
 
-struct vsf_sysutil_dir*
+unsafe struct vsf_sysutil_dir*
 str_opendir(const struct mystr* p_str)
 {
+  if (p_str == 0)
+  {
+    return 0;
+  }
   return vsf_sysutil_opendir(str_getbuf(p_str));
 }
 
-void
+unsafe void
 str_next_dirent(struct mystr* p_filename_str, struct vsf_sysutil_dir* p_dir)
 {
+  if (p_filename_str == 0 || p_dir == 0)
+  {
+    return;
+  }
   const char* p_filename = vsf_sysutil_next_dirent(p_dir);
   str_empty(p_filename_str);
   if (p_filename != 0)
@@ -143,9 +207,13 @@ str_next_dirent(struct mystr* p_filename_str, struct vsf_sysutil_dir* p_dir)
   }
 }
 
-int
+unsafe int
 str_readlink(struct mystr* p_str, const struct mystr* p_filename_str)
 {
+  if (p_str == 0 || p_filename_str == 0)
+  {
+    return -1;
+  }
   static char* p_readlink_buf;
   int retval;
   if (p_readlink_buf == 0)
@@ -165,15 +233,22 @@ str_readlink(struct mystr* p_str, const struct mystr* p_filename_str)
   return 0;
 }
 
-struct vsf_sysutil_user*
+unsafe struct vsf_sysutil_user*
 str_getpwnam(const struct mystr* p_user_str)
 {
+  if (p_user_str == 0)
+  {
+    return 0;
+  }
   return vsf_sysutil_getpwnam(str_getbuf(p_user_str));
 }
 
-void
+unsafe void
 str_syslog(const struct mystr* p_str, int severe)
 {
+  if (p_str == 0)
+  {
+    return;
+  }
   vsf_sysutil_syslog(str_getbuf(p_str), severe);
 }
-

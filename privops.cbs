@@ -20,14 +20,14 @@
 #include "logging.hbs"
 
 /* File private functions */
-static enum EVSFPrivopLoginResult handle_anonymous_login(
+unsafe static enum EVSFPrivopLoginResult handle_anonymous_login(
   struct vsf_session* p_sess, const struct mystr* p_pass_str);
-static enum EVSFPrivopLoginResult handle_local_login(
+unsafe static enum EVSFPrivopLoginResult handle_local_login(
   struct vsf_session* p_sess, struct mystr* p_user_str,
   const struct mystr* p_pass_str);
-static void setup_username_globals(struct vsf_session* p_sess,
+unsafe static void setup_username_globals(struct vsf_session* p_sess,
                                    const struct mystr* p_str);
-static enum EVSFPrivopLoginResult handle_login(
+unsafe static enum EVSFPrivopLoginResult handle_login(
   struct vsf_session* p_sess, struct mystr* p_user_str,
   const struct mystr* p_pass_str);
 
@@ -96,9 +96,13 @@ vsf_privop_get_ftp_port_sock(struct vsf_session* p_sess,
   return s;
 }
 
-void
+unsafe void
 vsf_privop_pasv_cleanup(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return;
+  }
   if (p_sess->pasv_listen_fd != -1)
   {
     vsf_sysutil_close(p_sess->pasv_listen_fd);
@@ -106,9 +110,13 @@ vsf_privop_pasv_cleanup(struct vsf_session* p_sess)
   }
 }
 
-int
+unsafe int
 vsf_privop_pasv_active(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return 0;
+  }
   if (p_sess->pasv_listen_fd != -1)
   {
     return 1;
@@ -116,9 +124,13 @@ vsf_privop_pasv_active(struct vsf_session* p_sess)
   return 0;
 }
 
-unsigned short
+unsafe unsigned short
 vsf_privop_pasv_listen(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return 0;
+  }
   static struct vsf_sysutil_sockaddr* s_p_sockaddr;
   int bind_retries = 10;
   unsigned short the_port;
@@ -188,9 +200,13 @@ vsf_privop_pasv_listen(struct vsf_session* p_sess)
   return the_port;
 }
 
-int
+unsafe int
 vsf_privop_accept_pasv(struct vsf_session* p_sess)
 {
+  if (p_sess == 0)
+  {
+    return -1;
+  }
   struct vsf_sysutil_sockaddr* p_accept_addr = 0;
   int remote_fd;
   if (p_sess->pasv_listen_fd == -1)
@@ -222,9 +238,13 @@ vsf_privop_accept_pasv(struct vsf_session* p_sess)
   return remote_fd;
 }
 
-void
+unsafe void
 vsf_privop_do_file_chown(struct vsf_session* p_sess, int fd)
 {
+  if (p_sess == 0 || fd < 0)
+  {
+    return;
+  }
   static struct vsf_sysutil_statbuf* s_p_statbuf;
   vsf_sysutil_fstat(fd, &s_p_statbuf);
   /* Do nothing if it is already owned by the desired user. */
@@ -276,10 +296,14 @@ vsf_privop_do_login(struct vsf_session* p_sess,
   return result;
 }
 
-static enum EVSFPrivopLoginResult
+unsafe static enum EVSFPrivopLoginResult
 handle_login(struct vsf_session* p_sess, struct mystr* p_user_str,
              const struct mystr* p_pass_str)
 {
+  if (p_sess == 0 || p_user_str == 0 || p_pass_str == 0)
+  {
+    return kVSFLoginFail;
+  }
   /* Do not assume PAM can cope with dodgy input, even though it
    * almost certainly can.
    */
@@ -341,10 +365,14 @@ handle_login(struct vsf_session* p_sess, struct mystr* p_user_str,
   }
 }
 
-static enum EVSFPrivopLoginResult
+unsafe static enum EVSFPrivopLoginResult
 handle_anonymous_login(struct vsf_session* p_sess,
                        const struct mystr* p_pass_str)
 {
+  if (p_sess == 0 || p_pass_str == 0)
+  {
+    return kVSFLoginFail;
+  }
   if (!str_isempty(&p_sess->banned_email_str) &&
       str_contains_line(&p_sess->banned_email_str, p_pass_str))
   {
@@ -379,11 +407,15 @@ handle_anonymous_login(struct vsf_session* p_sess,
   return kVSFLoginAnon;
 }
 
-static enum EVSFPrivopLoginResult
+unsafe static enum EVSFPrivopLoginResult
 handle_local_login(struct vsf_session* p_sess,
                    struct mystr* p_user_str,
                    const struct mystr* p_pass_str)
 {
+  if (p_sess == 0 || p_user_str == 0 || p_pass_str == 0)
+  {
+    return kVSFLoginFail;
+  }
   if (!vsf_sysdep_check_auth(p_user_str, p_pass_str, &p_sess->remote_ip_str))
   {
     return kVSFLoginFail;
@@ -392,9 +424,13 @@ handle_local_login(struct vsf_session* p_sess,
   return kVSFLoginReal;
 }
 
-static void
+unsafe static void
 setup_username_globals(struct vsf_session* p_sess, const struct mystr* p_str)
 {
+  if (p_sess == 0 || p_str == 0)
+  {
+    return;
+  }
   str_copy(&p_sess->user_str, p_str);
   if (tunable_setproctitle_enable)
   {
@@ -406,4 +442,3 @@ setup_username_globals(struct vsf_session* p_sess, const struct mystr* p_str)
     str_free(&prefix_str);
   }
 }
-
