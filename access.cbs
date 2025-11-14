@@ -47,7 +47,8 @@ vsf_access_check_file(const struct mystr* p_filename_str)
 }
 
 unsafe int
-vsf_access_check_file_visible(const struct mystr* p_filename_str)
+vsf_access_check_file_visible(
+  const struct mystr* p_filename_str)
 {
   if (p_filename_str == 0)
   {
