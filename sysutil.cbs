@@ -499,13 +499,16 @@ vsf_sysutil_lseek_end(const int fd)
 void*
 vsf_sysutil_malloc(unsigned int size)
 {
-  void* p_ret;
   /* Paranoia - what if we got an integer overflow/underflow? */
   if (size == 0 || size > INT_MAX)
   {
     bug("zero or big size in vsf_sysutil_malloc");
-  }  
-  p_ret = malloc(size);
+  }
+  void* p_ret = 0;
+  unsafe
+  {
+    p_ret = malloc(size);
+  }
   if (p_ret == NULL)
   {
     die("malloc");

@@ -30,13 +30,15 @@ unsafe static int ssl_read_adapter(struct vsf_session* p_sess,
                                    unsigned int len);
 
 unsafe int
-ftp_write_str(const struct vsf_session* p_sess, const struct mystr* p_str,
+ftp_write_str(const struct vsf_session* p_sess,
+              const struct mystr* borrow p_str,
               enum EVSFRWTarget target)
 {
   if (p_sess == 0 || p_str == 0)
   {
     return -1;
   }
+  const struct mystr* p_raw_str = (const struct mystr*) p_str;
   if (target == kVSFRWData)
   {
     if (p_sess->data_use_ssl && p_sess->ssl_slave_active)
@@ -46,7 +48,7 @@ ftp_write_str(const struct vsf_session* p_sess, const struct mystr* p_str,
       priv_sock_send_cmd(p_sess->ssl_consumer_fd, PRIV_SOCK_DO_SSL_WRITE);
       priv_sock_send_str(p_sess->ssl_consumer_fd, p_str);
       written = priv_sock_get_int(p_sess->ssl_consumer_fd);
-      if (written > 0 && written == (int) str_getlen(p_str))
+      if (written > 0 && written == (int) str_getlen(p_raw_str))
       {
         ret = 0;
       }
@@ -54,11 +56,11 @@ ftp_write_str(const struct vsf_session* p_sess, const struct mystr* p_str,
     }
     else if (p_sess->data_use_ssl)
     {
-      return ssl_write_str(p_sess->p_data_ssl, p_str);
+      return ssl_write_str(p_sess->p_data_ssl, p_raw_str);
     }
     else
     {
-      return str_netfd_write(p_str, p_sess->data_fd);
+      return str_netfd_write(p_raw_str, p_sess->data_fd);
     }
   }
   else
@@ -71,22 +73,25 @@ ftp_write_str(const struct vsf_session* p_sess, const struct mystr* p_str,
     }
     else if (p_sess->control_use_ssl)
     {
-      return ssl_write_str(p_sess->p_control_ssl, p_str);
+      return ssl_write_str(p_sess->p_control_ssl, p_raw_str);
     }
     else
     {
-      return str_netfd_write(p_str, VSFTP_COMMAND_FD);
+      return str_netfd_write(p_raw_str, VSFTP_COMMAND_FD);
     }
   }
 }
 
 unsafe int
-ftp_read_data(struct vsf_session* p_sess, char* p_buf, unsigned int len)
+ftp_read_data(struct vsf_session* p_sess,
+              char* borrow p_buf,
+              unsigned int len)
 {
   if (p_sess == 0 || (p_buf == 0 && len != 0))
   {
     return -1;
   }
+  char* p_raw_buf = (char*) p_buf;
   if (p_sess->data_use_ssl && p_sess->ssl_slave_active)
   {
     int ret;
@@ -100,22 +105,24 @@ ftp_read_data(struct vsf_session* p_sess, char* p_buf, unsigned int len)
   }
   else if (p_sess->data_use_ssl)
   {
-    return ssl_read(p_sess, p_sess->p_data_ssl, p_buf, len);
+    return ssl_read(p_sess, p_sess->p_data_ssl, p_raw_buf, len);
   }
   else
   {
-    return vsf_sysutil_read(p_sess->data_fd, p_buf, len);
+    return vsf_sysutil_read(p_sess->data_fd, p_raw_buf, len);
   }
 }
 
 unsafe int
-ftp_write_data(const struct vsf_session* p_sess, const char* p_buf,
+ftp_write_data(const struct vsf_session* p_sess,
+               const char* borrow p_buf,
                unsigned int len)
 {
   if (p_sess == 0 || (p_buf == 0 && len != 0))
   {
     return -1;
   }
+  const char* p_raw_buf = (const char*) p_buf;
   if (p_sess->data_use_ssl && p_sess->ssl_slave_active)
   {
     int ret;
@@ -128,21 +135,25 @@ ftp_write_data(const struct vsf_session* p_sess, const char* p_buf,
   }
   else if (p_sess->data_use_ssl)
   {
-    return ssl_write(p_sess->p_data_ssl, p_buf, len);
+    return ssl_write(p_sess->p_data_ssl, p_raw_buf, len);
   }
   else
   {
-    return vsf_sysutil_write_loop(p_sess->data_fd, p_buf, len);
+    return vsf_sysutil_write_loop(p_sess->data_fd, p_raw_buf, len);
   }
 }
 
 unsafe int
-ftp_getline(struct vsf_session* p_sess, struct mystr* p_str, char* p_buf)
+ftp_getline(struct vsf_session* p_sess,
+            struct mystr* borrow p_str,
+            char* borrow p_buf)
 {
   if (p_sess == 0 || p_str == 0 || p_buf == 0)
   {
     return -1;
   }
+  struct mystr* p_raw_str = (struct mystr*) p_str;
+  char* p_raw_buf = (char*) p_buf;
   if (p_sess->control_use_ssl && p_sess->ssl_slave_active)
   {
     int ret;
@@ -164,9 +175,9 @@ ftp_getline(struct vsf_session* p_sess, struct mystr* p_str, char* p_buf)
       p_read = ssl_read_adapter;
     }
     return str_netfd_alloc(p_sess,
-                           p_str,
+                           p_raw_str,
                            '\n',
-                           p_buf,
+                           p_raw_buf,
                            VSFTP_MAX_COMMAND_LINE,
                            p_peek,
                            p_read);

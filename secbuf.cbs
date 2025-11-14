@@ -15,7 +15,7 @@
 #include "sysdeputil.hbs"
 
 unsafe void
-vsf_secbuf_alloc(char** p_ptr, unsigned int size)
+vsf_secbuf_alloc(char** borrow p_ptr, unsigned int size)
 {
   if (p_ptr == 0)
   {
@@ -72,7 +72,7 @@ vsf_secbuf_alloc(char** p_ptr, unsigned int size)
 }
 
 unsafe void
-vsf_secbuf_free(char** p_ptr)
+vsf_secbuf_free(char** borrow p_ptr)
 {
   if (p_ptr == 0)
   {

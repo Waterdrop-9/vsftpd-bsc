@@ -37,7 +37,8 @@ vsf_privop_get_ftp_port_sock(struct vsf_session* p_sess,
                              int use_port_sockaddr)
 {
   static struct vsf_sysutil_sockaddr* p_sockaddr;
-  const struct vsf_sysutil_sockaddr* p_connect_to;
+  const struct vsf_sysutil_sockaddr* borrow p_connect_to =
+    (const struct vsf_sysutil_sockaddr* borrow) p_sess->p_remote_addr;
   int retval;
   int i;
   int s = vsf_sysutil_get_ipsock(p_sess->p_local_addr);
@@ -61,7 +62,9 @@ vsf_privop_get_ftp_port_sock(struct vsf_session* p_sess,
   for (i = 0; i < 2; ++i)
   {
     double sleep_for;
-    vsf_sysutil_sockaddr_clone(&p_sockaddr, p_sess->p_local_addr);
+    struct vsf_sysutil_sockaddr** p_sockaddr_raw =
+      (struct vsf_sysutil_sockaddr**) &mut p_sockaddr;
+    vsf_sysutil_sockaddr_clone(p_sockaddr_raw, p_sess->p_local_addr);
     vsf_sysutil_sockaddr_set_port(p_sockaddr, port);
     retval = vsf_sysutil_bind(s, p_sockaddr);
     if (retval == 0)
@@ -79,14 +82,18 @@ vsf_privop_get_ftp_port_sock(struct vsf_session* p_sess,
   }
   if (use_port_sockaddr)
   {
-    p_connect_to = p_sess->p_port_sockaddr;
+    p_connect_to =
+      (const struct vsf_sysutil_sockaddr* borrow) p_sess->p_port_sockaddr;
   }
   else
   {
     vsf_sysutil_sockaddr_set_port(p_sess->p_remote_addr, remote_port);
-    p_connect_to = p_sess->p_remote_addr;
+    p_connect_to =
+      (const struct vsf_sysutil_sockaddr* borrow) p_sess->p_remote_addr;
   }
-  retval = vsf_sysutil_connect_timeout(s, p_connect_to,
+  const struct vsf_sysutil_sockaddr* p_connect_raw =
+    (const struct vsf_sysutil_sockaddr*) p_connect_to;
+  retval = vsf_sysutil_connect_timeout(s, p_connect_raw,
                                        tunable_connect_timeout);
   if (vsf_sysutil_retval_is_error(retval))
   {
@@ -137,7 +144,11 @@ vsf_privop_pasv_listen(struct vsf_session* p_sess)
   /* IPPORT_RESERVED */
   unsigned short min_port = 1024;
   unsigned short max_port = 65535;
-  int is_ipv6 = vsf_sysutil_sockaddr_is_ipv6(p_sess->p_local_addr);
+  const struct vsf_sysutil_sockaddr* borrow p_local =
+    (const struct vsf_sysutil_sockaddr* borrow) p_sess->p_local_addr;
+  const struct vsf_sysutil_sockaddr* p_local_raw =
+    (const struct vsf_sysutil_sockaddr*) p_local;
+  int is_ipv6 = vsf_sysutil_sockaddr_is_ipv6(p_local_raw);
   if (p_sess->pasv_listen_fd != -1)
   {
     die("listed fd already active");
@@ -172,7 +183,9 @@ vsf_privop_pasv_listen(struct vsf_session* p_sess)
       p_sess->pasv_listen_fd = vsf_sysutil_get_ipv4_sock();
     }
     vsf_sysutil_activate_reuseaddr(p_sess->pasv_listen_fd);
-    vsf_sysutil_sockaddr_clone(&s_p_sockaddr, p_sess->p_local_addr);
+    struct vsf_sysutil_sockaddr** p_clone_raw =
+      (struct vsf_sysutil_sockaddr**) &mut s_p_sockaddr;
+    vsf_sysutil_sockaddr_clone(p_clone_raw, p_sess->p_local_addr);
     vsf_sysutil_sockaddr_set_port(s_p_sockaddr, the_port);
     retval = vsf_sysutil_bind(p_sess->pasv_listen_fd, s_p_sockaddr);
     if (!vsf_sysutil_retval_is_error(retval))
@@ -213,12 +226,16 @@ vsf_privop_accept_pasv(struct vsf_session* p_sess)
   {
     die("listed fd not active");
   }
-  vsf_sysutil_sockaddr_alloc(&p_accept_addr);
+  struct vsf_sysutil_sockaddr** borrow p_accept_borrow =
+    (struct vsf_sysutil_sockaddr** borrow) &p_accept_addr;
+  struct vsf_sysutil_sockaddr** p_accept_raw =
+    (struct vsf_sysutil_sockaddr**) p_accept_borrow;
+  vsf_sysutil_sockaddr_alloc(p_accept_raw);
   remote_fd = vsf_sysutil_accept_timeout(p_sess->pasv_listen_fd, p_accept_addr,
                                          tunable_accept_timeout);
   if (vsf_sysutil_retval_is_error(remote_fd))
   {
-    vsf_sysutil_sockaddr_clear(&p_accept_addr);
+    vsf_sysutil_sockaddr_clear(p_accept_raw);
     return -1;
   }
   /* SECURITY:
@@ -227,14 +244,22 @@ vsf_privop_accept_pasv(struct vsf_session* p_sess)
    */
   if (!tunable_pasv_promiscuous)
   {
-    if (!vsf_sysutil_sockaddr_addr_equal(p_sess->p_remote_addr, p_accept_addr))
+    const struct vsf_sysutil_sockaddr* borrow p_remote =
+      (const struct vsf_sysutil_sockaddr* borrow) p_sess->p_remote_addr;
+    const struct vsf_sysutil_sockaddr* borrow p_accept =
+      (const struct vsf_sysutil_sockaddr* borrow) p_accept_addr;
+    const struct vsf_sysutil_sockaddr* p_remote_raw =
+      (const struct vsf_sysutil_sockaddr*) p_remote;
+    const struct vsf_sysutil_sockaddr* p_accept_raw_const =
+      (const struct vsf_sysutil_sockaddr*) p_accept;
+    if (!vsf_sysutil_sockaddr_addr_equal(p_remote_raw, p_accept_raw_const))
     {
       vsf_sysutil_close(remote_fd);
-      vsf_sysutil_sockaddr_clear(&p_accept_addr);
+      vsf_sysutil_sockaddr_clear(p_accept_raw);
       return -2;
     }
   }
-  vsf_sysutil_sockaddr_clear(&p_accept_addr);
+  vsf_sysutil_sockaddr_clear(p_accept_raw);
   return remote_fd;
 }
 

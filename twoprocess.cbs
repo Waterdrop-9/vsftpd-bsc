@@ -193,8 +193,12 @@ vsf_two_process_login(struct vsf_session* p_sess,
   }
   char result;
   priv_sock_send_cmd(p_sess->child_fd, PRIV_SOCK_LOGIN);
-  priv_sock_send_str(p_sess->child_fd, &p_sess->user_str);
-  priv_sock_send_str(p_sess->child_fd, p_pass_str);
+    const struct mystr* borrow p_user_borrow =
+      (const struct mystr* borrow) &p_sess->user_str;
+    const struct mystr* borrow p_pass_borrow =
+      (const struct mystr* borrow) p_pass_str;
+    priv_sock_send_str(p_sess->child_fd, p_user_borrow);
+    priv_sock_send_str(p_sess->child_fd, p_pass_borrow);
   priv_sock_send_int(p_sess->child_fd, p_sess->control_use_ssl);
   priv_sock_send_int(p_sess->child_fd, p_sess->data_use_ssl);
   result = priv_sock_get_result(p_sess->child_fd);
@@ -338,8 +342,12 @@ process_login_req(struct vsf_session* p_sess)
   /* Get username and password - we must distrust these */
   {
     struct mystr password_str = INIT_MYSTR;
-    priv_sock_get_str(p_sess->parent_fd, &p_sess->user_str);
-    priv_sock_get_str(p_sess->parent_fd, &password_str);
+    struct mystr* borrow p_user_borrow_mut =
+      (struct mystr* borrow) &p_sess->user_str;
+    struct mystr* borrow p_pass_borrow_mut =
+      (struct mystr* borrow) &password_str;
+    priv_sock_get_str(p_sess->parent_fd, p_user_borrow_mut);
+    priv_sock_get_str(p_sess->parent_fd, p_pass_borrow_mut);
     p_sess->control_use_ssl = priv_sock_get_int(p_sess->parent_fd);
     p_sess->data_use_ssl = priv_sock_get_int(p_sess->parent_fd);
     if (!tunable_ssl_enable)

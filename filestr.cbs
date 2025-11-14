@@ -27,6 +27,8 @@ str_fileread(struct mystr* p_str, const char* p_filename, unsigned int maxsize)
   safe int retval = 0;
   safe filesize_t size = 0;
   char* p_sec_buf = 0;
+  char** borrow p_secbuf_borrow =
+    (char** borrow) &p_sec_buf;
   struct vsf_sysutil_statbuf* p_stat = 0;
   /* In case we fail, make sure we return an empty string */
   str_empty(p_str);
@@ -43,7 +45,7 @@ str_fileread(struct mystr* p_str, const char* p_filename, unsigned int maxsize)
     {
       size = maxsize;
     }
-    vsf_secbuf_alloc(&p_sec_buf, (unsigned int) size);
+    vsf_secbuf_alloc(p_secbuf_borrow, (unsigned int) size);
 
     retval = vsf_sysutil_read_loop(fd, p_sec_buf, (unsigned int) size);
     if (vsf_sysutil_retval_is_error(retval))
@@ -58,7 +60,7 @@ str_fileread(struct mystr* p_str, const char* p_filename, unsigned int maxsize)
   }
 free_out:
   vsf_sysutil_free(p_stat);
-  vsf_secbuf_free(&p_sec_buf);
+  vsf_secbuf_free(p_secbuf_borrow);
   vsf_sysutil_close(fd);
   return retval;
 }

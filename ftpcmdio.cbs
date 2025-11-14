@@ -94,7 +94,9 @@ vsf_cmdio_write_raw(struct vsf_session* p_sess, const char* p_text)
   {
     vsf_log_line(p_sess, kVSFLogEntryFTPOutput, &s_the_str);
   }
-  retval = ftp_write_str(p_sess, &s_the_str, kVSFRWControl);
+  const struct mystr* borrow p_str_borrow =
+    (const struct mystr* borrow) &s_the_str;
+  retval = ftp_write_str(p_sess, p_str_borrow, kVSFRWControl);
   if (retval != 0)
   {
     die("ftp_write_str");
@@ -186,7 +188,9 @@ ftp_write_str_common(struct vsf_session* p_sess, int status, char sep,
   str_append_char(&s_write_buf_str, sep);
   str_append_str(&s_write_buf_str, &s_text_mangle_str);
   str_append_text(&s_write_buf_str, "\r\n");
-  retval = ftp_write_str(p_sess, &s_write_buf_str, kVSFRWControl);
+  const struct mystr* borrow p_write_buf_borrow =
+    (const struct mystr* borrow) &s_write_buf_str;
+  retval = ftp_write_str(p_sess, p_write_buf_borrow, kVSFRWControl);
   if (retval != 0)
   {
     die("ftp_write");
@@ -280,9 +284,16 @@ control_getline(struct mystr* p_str, struct vsf_session* p_sess)
   int ret;
   if (p_sess->p_control_line_buf == 0)
   {
-    vsf_secbuf_alloc(&p_sess->p_control_line_buf, VSFTP_MAX_COMMAND_LINE);
+    char** borrow p_control_buf_borrow =
+      (char** borrow) &p_sess->p_control_line_buf;
+    vsf_secbuf_alloc(p_control_buf_borrow, VSFTP_MAX_COMMAND_LINE);
   }
-  ret = ftp_getline(p_sess, p_str, p_sess->p_control_line_buf);
+  char* p_ctrl_buf = p_sess->p_control_line_buf;
+  char* borrow p_ctrl_buf_borrow =
+    (char* borrow) p_ctrl_buf;
+  struct mystr* borrow p_str_borrow_mut =
+    (struct mystr* borrow) p_str;
+  ret = ftp_getline(p_sess, p_str_borrow_mut, p_ctrl_buf_borrow);
   if (ret == 0)
   {
     return ret;
@@ -304,4 +315,3 @@ control_getline(struct mystr* p_str, struct vsf_session* p_sess)
   }
   return 1;
 }
-

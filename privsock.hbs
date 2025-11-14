@@ -56,7 +56,7 @@ unsafe void priv_sock_send_cmd(int fd, char cmd);
  * fd           - the fd on which to send the string
  * p_str        - the string to send
  */
-unsafe void priv_sock_send_str(int fd, const struct mystr* p_str);
+unsafe void priv_sock_send_str(int fd, const struct mystr* borrow p_str);
 
 /* priv_sock_send_buf()
  * PURPOSE
@@ -67,7 +67,7 @@ unsafe void priv_sock_send_str(int fd, const struct mystr* p_str);
  * p_buf        - the buffer to send
  * len          - length of the buffer
  */
-unsafe void priv_sock_send_buf(int fd, const char* p_buf, unsigned int len);
+unsafe void priv_sock_send_buf(int fd, const char* borrow p_buf, unsigned int len);
 
 /* priv_sock_recv_buf()
  * PURPOSE
@@ -78,7 +78,7 @@ unsafe void priv_sock_send_buf(int fd, const char* p_buf, unsigned int len);
  * p_buf        - the buffer to write into
  * len          - length of the buffer
  */
-unsafe void priv_sock_recv_buf(int fd, char* p_buf, unsigned int len);
+unsafe void priv_sock_recv_buf(int fd, char* borrow p_buf, unsigned int len);
 
 /* priv_sock_get_result()
  * PURPOSE
@@ -107,7 +107,7 @@ unsafe char priv_sock_get_cmd(int fd);
  * fd           - the fd on which to receive the string
  * p_dest       - where to copy the received string
  */
-unsafe void priv_sock_get_str(int fd, struct mystr* p_dest);
+unsafe void priv_sock_get_str(int fd, struct mystr* borrow p_dest);
 
 /* priv_sock_send_result()
  * PURPOSE

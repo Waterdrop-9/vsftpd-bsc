@@ -39,18 +39,32 @@ ssl_slave(struct vsf_session* p_sess)
     int ret;
     if (cmd == PRIV_SOCK_GET_USER_CMD)
     {
-      ret = ftp_getline(p_sess, &p_sess->ftp_cmd_str,
-                        p_sess->p_control_line_buf);
+      struct mystr* p_cmd = &p_sess->ftp_cmd_str;
+      struct mystr* borrow p_cmd_borrow =
+        (struct mystr* borrow) p_cmd;
+      char* p_ctrl_buf = p_sess->p_control_line_buf;
+      char* borrow p_ctrl_borrow =
+        (char* borrow) p_ctrl_buf;
+      ret = ftp_getline(p_sess, p_cmd_borrow, p_ctrl_borrow);
       priv_sock_send_int(p_sess->ssl_slave_fd, ret);
       if (ret >= 0)
       {
-        priv_sock_send_str(p_sess->ssl_slave_fd, &p_sess->ftp_cmd_str);
+        const struct mystr* p_cmd_const_raw = &p_sess->ftp_cmd_str;
+        const struct mystr* borrow p_cmd_const =
+          (const struct mystr* borrow) p_cmd_const_raw;
+        priv_sock_send_str(p_sess->ssl_slave_fd, p_cmd_const);
       }
     }
     else if (cmd == PRIV_SOCK_WRITE_USER_RESP)
     {
-      priv_sock_get_str(p_sess->ssl_slave_fd, &p_sess->ftp_cmd_str);
-      ret = ftp_write_str(p_sess, &p_sess->ftp_cmd_str, kVSFRWControl);
+      struct mystr* p_cmd = &p_sess->ftp_cmd_str;
+      struct mystr* borrow p_cmd_borrow =
+        (struct mystr* borrow) p_cmd;
+      priv_sock_get_str(p_sess->ssl_slave_fd, p_cmd_borrow);
+      const struct mystr* p_cmd_const_raw = &p_sess->ftp_cmd_str;
+      const struct mystr* borrow p_cmd_const =
+        (const struct mystr* borrow) p_cmd_const_raw;
+      ret = ftp_write_str(p_sess, p_cmd_const, kVSFRWControl);
       priv_sock_send_int(p_sess->ssl_slave_fd, ret);
     }
     else if (cmd == PRIV_SOCK_DO_SSL_HANDSHAKE)
@@ -87,7 +101,9 @@ ssl_slave(struct vsf_session* p_sess)
       str_trunc(&data_str, (unsigned int) size);
       ret = ssl_read_into_str(p_sess, p_sess->p_data_ssl, &data_str);
       priv_sock_send_int(p_sess->ssl_slave_fd, ret);
-      priv_sock_send_str(p_sess->ssl_slave_fd, &data_str);
+      const struct mystr* borrow p_data_const =
+        (const struct mystr* borrow) &data_str;
+      priv_sock_send_str(p_sess->ssl_slave_fd, p_data_const);
     }
     else if (cmd == PRIV_SOCK_DO_SSL_WRITE)
     {
@@ -95,7 +111,9 @@ ssl_slave(struct vsf_session* p_sess)
       {
         bug("invalid state");
       }
-      priv_sock_get_str(p_sess->ssl_slave_fd, &data_str);
+      struct mystr* borrow p_data_borrow =
+        (struct mystr* borrow) &data_str;
+      priv_sock_get_str(p_sess->ssl_slave_fd, p_data_borrow);
       ret = ssl_write(p_sess->p_data_ssl,
                       str_getbuf(&data_str),
                       str_getlen(&data_str));
@@ -130,3 +148,5 @@ ssl_slave(struct vsf_session* p_sess)
     }
   }
 }
+
+

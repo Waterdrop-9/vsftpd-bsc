@@ -21,10 +21,14 @@
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 
-unsafe static int socket_validator(struct pt_sandbox* p_sandbox, void* p_arg);
-unsafe static int connect_validator(struct pt_sandbox* p_sandbox, void* p_arg);
-unsafe static int getsockopt_validator(struct pt_sandbox* p_sandbox, void* p_arg);
-unsafe static int setsockopt_validator(struct pt_sandbox* p_sandbox, void* p_arg);
+unsafe static int socket_validator(struct pt_sandbox* borrow p_sandbox,
+                                   void* p_arg);
+unsafe static int connect_validator(struct pt_sandbox* borrow p_sandbox,
+                                    void* p_arg);
+unsafe static int getsockopt_validator(struct pt_sandbox* borrow p_sandbox,
+                                       void* p_arg);
+unsafe static int setsockopt_validator(struct pt_sandbox* borrow p_sandbox,
+                                       void* p_arg);
 
 unsafe void
 policy_setup(struct pt_sandbox* p_sandbox, const struct vsf_session* p_sess)
@@ -162,7 +166,7 @@ policy_setup(struct pt_sandbox* p_sandbox, const struct vsf_session* p_sess)
 }
 
 unsafe static int
-socket_validator(struct pt_sandbox* p_sandbox, void* p_arg)
+socket_validator(struct pt_sandbox* borrow p_sandbox, void* p_arg)
 {
   if (p_sandbox == 0 || p_arg == 0)
   {
@@ -173,16 +177,22 @@ socket_validator(struct pt_sandbox* p_sandbox, void* p_arg)
   safe unsigned long arg1 = 0;
   safe unsigned long arg2 = 0;
   safe unsigned long expected_family = AF_INET;
+  struct pt_sandbox* borrow p_sandbox_borrow =
+    (struct pt_sandbox* borrow) p_sandbox;
+  unsigned long* borrow p_arg1_borrow =
+    (unsigned long* borrow) &arg1;
+  unsigned long* borrow p_arg2_borrow =
+    (unsigned long* borrow) &arg2;
   if (vsf_sysutil_sockaddr_is_ipv6(p_sess->p_local_addr))
   {
     expected_family = AF_INET6;
   }
-  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox, 0, &arg1);
+  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox_borrow, 0, p_arg1_borrow);
   if (ret != 0)
   {
     return ret;
   }
-  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox, 1, &arg2);
+  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox_borrow, 1, p_arg2_borrow);
   if (ret != 0)
   {
     return ret;
@@ -195,7 +205,7 @@ socket_validator(struct pt_sandbox* p_sandbox, void* p_arg)
 }
 
 unsafe static int
-connect_validator(struct pt_sandbox* p_sandbox, void* p_arg)
+connect_validator(struct pt_sandbox* borrow p_sandbox, void* p_arg)
 {
   if (p_sandbox == 0 || p_arg == 0)
   {
@@ -210,17 +220,23 @@ connect_validator(struct pt_sandbox* p_sandbox, void* p_arg)
   char* p_buf = 0;
   struct sockaddr* p_sockaddr = 0;
   static struct vsf_sysutil_sockaddr* p_sockptr;
+  struct pt_sandbox* borrow p_sandbox_borrow =
+    (struct pt_sandbox* borrow) p_sandbox;
+  unsigned long* borrow p_arg2_borrow =
+    (unsigned long* borrow) &arg2;
+  unsigned long* borrow p_arg3_borrow =
+    (unsigned long* borrow) &arg3;
   if (vsf_sysutil_sockaddr_is_ipv6(p_sess->p_local_addr))
   {
     expected_family = AF_INET6;
     expected_len = sizeof(struct sockaddr_in6);
   }
-  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox, 1, &arg2);
+  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox_borrow, 1, p_arg2_borrow);
   if (ret != 0)
   {
     return ret;
   }
-  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox, 2, &arg3);
+  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox_borrow, 2, p_arg3_borrow);
   if (ret != 0)
   {
     return ret;
@@ -230,7 +246,8 @@ connect_validator(struct pt_sandbox* p_sandbox, void* p_arg)
     return -1;
   }
   p_buf = vsf_sysutil_malloc((int) expected_len);
-  ret = ptrace_sandbox_get_buf(p_sandbox, arg2, expected_len, p_buf);
+  char* borrow p_buf_borrow = (char* borrow) p_buf;
+  ret = ptrace_sandbox_get_buf(p_sandbox_borrow, arg2, expected_len, p_buf_borrow);
   if (ret != 0)
   {
     vsf_sysutil_free(p_buf);
@@ -268,7 +285,7 @@ connect_validator(struct pt_sandbox* p_sandbox, void* p_arg)
 }
 
 unsafe static int
-getsockopt_validator(struct pt_sandbox* p_sandbox, void* p_arg)
+getsockopt_validator(struct pt_sandbox* borrow p_sandbox, void* p_arg)
 {
   if (p_sandbox == 0)
   {
@@ -278,12 +295,18 @@ getsockopt_validator(struct pt_sandbox* p_sandbox, void* p_arg)
   safe unsigned long arg2 = 0;
   safe unsigned long arg3 = 0;
   (void) p_arg;
-  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox, 1, &arg2);
+  struct pt_sandbox* borrow p_sandbox_borrow =
+    (struct pt_sandbox* borrow) p_sandbox;
+  unsigned long* borrow p_arg2_borrow =
+    (unsigned long* borrow) &arg2;
+  unsigned long* borrow p_arg3_borrow =
+    (unsigned long* borrow) &arg3;
+  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox_borrow, 1, p_arg2_borrow);
   if (ret != 0)
   {
     return ret;
   }
-  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox, 2, &arg3);
+  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox_borrow, 2, p_arg3_borrow);
   if (ret != 0)
   {
     return ret;
@@ -296,7 +319,7 @@ getsockopt_validator(struct pt_sandbox* p_sandbox, void* p_arg)
 }
 
 unsafe static int
-setsockopt_validator(struct pt_sandbox* p_sandbox, void* p_arg)
+setsockopt_validator(struct pt_sandbox* borrow p_sandbox, void* p_arg)
 {
   if (p_sandbox == 0)
   {
@@ -306,12 +329,18 @@ setsockopt_validator(struct pt_sandbox* p_sandbox, void* p_arg)
   safe unsigned long arg2 = 0;
   safe unsigned long arg3 = 0;
   (void) p_arg;
-  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox, 1, &arg2);
+  struct pt_sandbox* borrow p_sandbox_borrow =
+    (struct pt_sandbox* borrow) p_sandbox;
+  unsigned long* borrow p_arg2_borrow =
+    (unsigned long* borrow) &arg2;
+  unsigned long* borrow p_arg3_borrow =
+    (unsigned long* borrow) &arg3;
+  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox_borrow, 1, p_arg2_borrow);
   if (ret != 0)
   {
     return ret;
   }
-  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox, 2, &arg3);
+  ret = ptrace_sandbox_get_socketcall_arg(p_sandbox_borrow, 2, p_arg3_borrow);
   if (ret != 0)
   {
     return ret;
