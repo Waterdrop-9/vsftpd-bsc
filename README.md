@@ -1,7 +1,7 @@
 # vsftpd-bsc
 
 ## Introduction
-**vsftpd-bsc** is an experimental repository that applies [BiShengC](https://gitee.com/bisheng_c_language_dep/llvm-project/blob/bishengc/15.0.4/clang/docs/BSC/BiShengCLanguageUserManual.md) (the BiSheng C language) to the classic FTP server **vsftpd-3.0.5** in order to enhance its memory safety. The original repo of vsftpd is [HERE](https://security.appspot.com/vsftpd.html).
+**vsftpd-bsc** is an experimental repository that applies [BiShengC](https://gitee.com/bisheng_c_language_dep/llvm-project/blob/bishengc/15.0.4/clang/docs/BSC/BiShengCLanguageUserManual.md) (a version of enchaned C language)to the classic FTP server **vsftpd-3.0.5** in order to enhance its memory safety. The original project page of vsftpd is [HERE](https://security.appspot.com/vsftpd.html).
 
 
 The goal is to introduce BiShengC features while preserving the original vsftpd behavior and performance as much as possible:
