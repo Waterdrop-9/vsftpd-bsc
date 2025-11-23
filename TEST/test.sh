@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
-# More complete vsftpd functional test suite (curl based).
-# Coverage:
+# vsftpd functional test suite (curl based).
+# Coverage (driven by upstream feature highlights):
 #   1) Port reachability / banner
 #   2) Anonymous login + list (optional)
 #   3) Anonymous upload policy (expect deny by default)
-#   4) Local user login
-#   5) PASV/PORT directory listing
+#   4) Local user login / bad password rejection
+#   5) PASV / PORT directory listing
 #   6) Upload / download / delete
 #   7) Rename (RNFR/RNTO)
 #   8) Resume download (REST)
 #   9) Nested directory create/remove
-#  10) Bad password is rejected
+#  10) ASCII mode transfer
+#  11) Chroot enforcement (optional expectation)
+#  12) Banner content check (optional)
 
 set -o pipefail
 
@@ -30,6 +32,12 @@ USE_TLS="${USE_TLS:-0}"
 TLS_INSECURE="${TLS_INSECURE:-1}"
 # In NATed lab environments you may want to skip active mode.
 SKIP_ACTIVE="${SKIP_ACTIVE:-0}"
+# If chroot_local_user=YES is expected, set EXPECT_CHROOT=1 to assert CWD .. fails.
+EXPECT_CHROOT="${EXPECT_CHROOT:-0}"
+# If you want to assert banner contains a substring (ftpd_banner), set this.
+EXPECT_BANNER_SUBSTR="${EXPECT_BANNER_SUBSTR:-}"
+# Toggle ASCII mode transfer test (TYPE A).
+RUN_ASCII_TEST="${RUN_ASCII_TEST:-1}"
 
 FTP_URL="ftp://${HOST}:${PORT}"
 FAILED=0
@@ -39,7 +47,7 @@ declare -a CLEANUP_DIRS=()
 # Helpers
 ########################
 check_dep() {
-  for cmd in curl mktemp cmp head; do
+  for cmd in curl mktemp cmp head tr; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
       echo "[FATAL] missing dependency: $cmd"
       exit 1
@@ -92,6 +100,11 @@ mk_payload() {
   head -c 16384 </dev/zero | tr '\0' 'X' >"$path"
 }
 
+normalize_crlf() {
+  # Strip CR to make ASCII transfer comparisons reliable across servers.
+  tr -d '\r' <"$1" >"$2"
+}
+
 ########################
 # Tests
 ########################
@@ -99,6 +112,22 @@ mk_payload() {
 test_connect_port() {
   # Basic reachability; expect greeting.
   curl -sS --fail --connect-timeout 5 $(curl_tls_args) "$FTP_URL/" >/dev/null
+}
+
+test_banner_contains() {
+  if [ -z "$EXPECT_BANNER_SUBSTR" ]; then
+    echo "No EXPECT_BANNER_SUBSTR set; skipping banner match check."
+    return 0
+  fi
+
+  local out
+  out="$(curl -v --connect-timeout 5 $(curl_tls_args) "$FTP_URL/" -o /dev/null 2>&1 || true)"
+  if printf "%s" "$out" | grep -qi "220 .*${EXPECT_BANNER_SUBSTR}"; then
+    return 0
+  fi
+
+  echo "Banner does not contain expected substring: $EXPECT_BANNER_SUBSTR"
+  return 1
 }
 
 test_anon_login_list() {
@@ -134,7 +163,7 @@ test_anon_upload_policy() {
     --ftp-pasv \
     -T "$tmp_file" \
     "$FTP_URL/$target" >/dev/null 2>&1; then
-    echo "Anonymous upload unexpectedly succeeded (set ANON_UPLOAD_ALLOWED=1 if this is intentional)."
+    echo "Anonymous upload unexpectedly succeeded (set ANON_UPLOAD_ALLOWED=1 if intentional)."
     curl -sS $(curl_tls_args) \
       --user "anonymous:anonymous@" \
       --ftp-pasv \
@@ -360,6 +389,68 @@ test_local_resume_download() {
   return 0
 }
 
+test_ascii_transfer() {
+  if [ "$RUN_ASCII_TEST" -ne 1 ]; then
+    echo "Skip ASCII mode test (RUN_ASCII_TEST=0)"
+    return 0
+  fi
+
+  local test_dir="bsc_ascii_$$"
+  local remote_file="ascii_test.txt"
+  local src_file dl_file src_norm dl_norm
+
+  src_file="$(mktemp "$TMP_DIR/vsftpd_ascii_src_XXXXXX")"
+  dl_file="$(mktemp "$TMP_DIR/vsftpd_ascii_dl_XXXXXX")"
+  src_norm="$(mktemp "$TMP_DIR/vsftpd_ascii_src_norm_XXXXXX")"
+  dl_norm="$(mktemp "$TMP_DIR/vsftpd_ascii_dl_norm_XXXXXX")"
+
+  printf "line1\nline2\nline3\n" >"$src_file"
+  register_cleanup_dir "$test_dir"
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    --quote "MKD $test_dir" \
+    "$FTP_URL/" >/dev/null
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    --use-ascii \
+    -T "$src_file" \
+    "$FTP_URL/$test_dir/$remote_file" >/dev/null
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    "$FTP_URL/$test_dir/$remote_file" \
+    -o "$dl_file"
+
+  normalize_crlf "$src_file" "$src_norm"
+  normalize_crlf "$dl_file" "$dl_norm"
+
+  if ! cmp -s "$src_norm" "$dl_norm"; then
+    echo "ASCII transfer content mismatch"
+    rm -f "$src_file" "$dl_file" "$src_norm" "$dl_norm"
+    return 1
+  fi
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    --quote "DELE $test_dir/$remote_file" \
+    "$FTP_URL/" >/dev/null
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    --quote "RMD $test_dir" \
+    "$FTP_URL/" >/dev/null
+
+  rm -f "$src_file" "$dl_file" "$src_norm" "$dl_norm"
+  return 0
+}
+
 test_nested_dirs() {
   local test_dir="bsc_nested_$$"
   local nested="$test_dir/sub/child"
@@ -387,6 +478,23 @@ test_nested_dirs() {
     "$FTP_URL/" >/dev/null
 }
 
+test_chroot_enforced() {
+  if [ "$EXPECT_CHROOT" -ne 1 ]; then
+    echo "Skip chroot expectation (EXPECT_CHROOT=0)"
+    return 0
+  fi
+
+  if curl -sS $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    --quote "CWD .." \
+    "$FTP_URL/" >/dev/null 2>&1; then
+    echo "CWD .. succeeded but EXPECT_CHROOT=1"
+    return 1
+  fi
+  return 0
+}
+
 ########################
 # Main
 ########################
@@ -397,34 +505,39 @@ main() {
   echo "Local user: $LOCAL_USER"
   echo "TLS required: $USE_TLS (insecure cert: $TLS_INSECURE)"
   echo "Skip active mode: $SKIP_ACTIVE"
+  echo "Expect chroot: $EXPECT_CHROOT"
+  echo "Banner expect: ${EXPECT_BANNER_SUBSTR:-<none>}"
   echo
 
   check_dep
 
   run_test "1. Port reachable" test_connect_port
+  run_test "2. Banner content check" test_banner_contains
 
   if [ "$ANON_ENABLED" -eq 1 ]; then
-    run_test "2. Anonymous login + list" test_anon_login_list
-    run_test "3. Anonymous upload policy" test_anon_upload_policy
+    run_test "3. Anonymous login + list" test_anon_login_list
+    run_test "4. Anonymous upload policy" test_anon_upload_policy
   else
     echo "Skip anonymous tests (ANON_ENABLED=0)"
     echo
   fi
 
   if [ -n "$LOCAL_USER" ]; then
-    run_test "4. Local login (PASV)" test_local_login
-    run_test "5. Bad password rejected" test_bad_password_rejected
-    run_test "6. PASV listing" test_pasv_list
+    run_test "5. Local login (PASV)" test_local_login
+    run_test "6. Bad password rejected" test_bad_password_rejected
+    run_test "7. PASV listing" test_pasv_list
     if [ "$SKIP_ACTIVE" -eq 0 ]; then
-      run_test "7. PORT listing" test_active_list
+      run_test "8. PORT listing" test_active_list
     else
       echo "Skip active mode test (SKIP_ACTIVE=1)"
       echo
     fi
-    run_test "8. Upload / download / delete (PASV)" test_local_upload_download_delete_pasv
-    run_test "9. Rename (RNFR/RNTO)" test_local_rename
-    run_test "10. Resume download (REST)" test_local_resume_download
-    run_test "11. Nested directory create/remove" test_nested_dirs
+    run_test "9. Upload / download / delete (PASV)" test_local_upload_download_delete_pasv
+    run_test "10. Rename (RNFR/RNTO)" test_local_rename
+    run_test "11. Resume download (REST)" test_local_resume_download
+    run_test "12. Nested directory create/remove" test_nested_dirs
+    run_test "13. ASCII transfer (TYPE A)" test_ascii_transfer
+    run_test "14. Chroot enforcement (CWD .. fails)" test_chroot_enforced
   else
     echo "No LOCAL_USER configured, skip local-user tests."
     echo
