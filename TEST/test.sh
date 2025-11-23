@@ -1,57 +1,66 @@
 #!/usr/bin/env bash
-#
-# 简单的 vsftpd 功能测试脚本（基于 curl）
-#
-# 测试内容：
-# 1. 能否连接到 FTP 服务器端口
-# 2. 匿名登录 + 列出根目录（如果允许匿名）
-# 3. 本地用户登录
-# 4. 本地用户上传 / 下载 / 删除文件
-# 5. 被动模式 / 主动模式下的目录访问
-#
-# 使用方法：
-#   chmod +x test_vsftpd.sh
-#   修改下面的 HOST / PORT / LOCAL_USER / LOCAL_PASS 等变量后运行：
-#   ./test_vsftpd.sh
-#
+# More complete vsftpd functional test suite (curl based).
+# Coverage:
+#   1) Port reachability / banner
+#   2) Anonymous login + list (optional)
+#   3) Anonymous upload policy (expect deny by default)
+#   4) Local user login
+#   5) PASV/PORT directory listing
+#   6) Upload / download / delete
+#   7) Rename (RNFR/RNTO)
+#   8) Resume download (REST)
+#   9) Nested directory create/remove
+#  10) Bad password is rejected
+
+set -o pipefail
 
 ########################
-# 配置区域（请按需修改）
+# Config (override via env)
 ########################
+HOST="${HOST:-localhost}"
+PORT="${PORT:-21}"
+ANON_ENABLED="${ANON_ENABLED:-0}"
+# If your server intentionally allows anonymous upload, set to 1.
+ANON_UPLOAD_ALLOWED="${ANON_UPLOAD_ALLOWED:-0}"
+LOCAL_USER="${LOCAL_USER:-xpf}"
+LOCAL_PASS="${LOCAL_PASS:-po450}"
+TMP_DIR="${TMP_DIR:-/tmp}"
+# Force TLS (explicit FTPS); set to 1 to require, TLS_INSECURE=1 to skip cert check.
+USE_TLS="${USE_TLS:-0}"
+TLS_INSECURE="${TLS_INSECURE:-1}"
+# In NATed lab environments you may want to skip active mode.
+SKIP_ACTIVE="${SKIP_ACTIVE:-0}"
 
-# vsftpd 所在主机和端口
-HOST="localhost"
-PORT=21
-
-# 是否测试匿名登录（vsftpd.conf 中 anonymous_enable=YES 时建议开）
-ANON_ENABLED=1
-
-# 测试用的本地用户（需要在系统中已经存在，并在 vsftpd.conf 中允许本地用户登录）
-LOCAL_USER="xpf"
-LOCAL_PASS="po450"
-
-# 本地临时目录（用来放测试文件）
-TMP_DIR="/tmp"
-
-########################
-# 工具函数
-########################
-
+FTP_URL="ftp://${HOST}:${PORT}"
 FAILED=0
+declare -a CLEANUP_DIRS=()
 
+########################
+# Helpers
+########################
 check_dep() {
-  for cmd in curl mktemp cmp; do
+  for cmd in curl mktemp cmp head; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
-      echo "[FATAL] 依赖命令 '$cmd' 未找到，请先安装再运行。"
+      echo "[FATAL] missing dependency: $cmd"
       exit 1
     fi
   done
 }
 
+curl_tls_args() {
+  if [ "$USE_TLS" -eq 1 ]; then
+    if [ "$TLS_INSECURE" -eq 1 ]; then
+      printf -- "--ssl-reqd --insecure"
+    else
+      printf -- "--ssl-reqd"
+    fi
+  fi
+}
+
 run_test() {
   local name="$1"
   shift
-  echo "======== 测试：$name ========"
+  echo "======== $name ========"
   if "$@"; then
     echo "[OK] $name"
   else
@@ -61,143 +70,371 @@ run_test() {
   echo
 }
 
-########################
-# 具体测试项
-########################
-
-# 1. 测试端口是否能连接
-test_connect_port() {
-  # 尝试用 curl 获取根目录（不登录），检查是否有响应
-  curl -sS --connect-timeout 5 "ftp://$HOST:$PORT/" >/dev/null 2>&1
+register_cleanup_dir() {
+  CLEANUP_DIRS+=("$1")
 }
 
-# 2. 匿名登录 + 列出根目录
+cleanup_remote_dirs() {
+  for dir in "${CLEANUP_DIRS[@]}"; do
+    curl -sS --fail $(curl_tls_args) \
+      --user "${LOCAL_USER}:${LOCAL_PASS}" \
+      --ftp-pasv \
+      --quote "RMD $dir" \
+      "$FTP_URL/" >/dev/null 2>&1 || true
+  done
+}
+
+trap cleanup_remote_dirs EXIT
+
+mk_payload() {
+  local path="$1"
+  # Create 16 KiB predictable payload so resume/compare is reliable.
+  head -c 16384 </dev/zero | tr '\0' 'X' >"$path"
+}
+
+########################
+# Tests
+########################
+
+test_connect_port() {
+  # Basic reachability; expect greeting.
+  curl -sS --fail --connect-timeout 5 $(curl_tls_args) "$FTP_URL/" >/dev/null
+}
+
 test_anon_login_list() {
-  curl -sS --fail \
+  curl -sS --fail $(curl_tls_args) \
     --user "anonymous:anonymous@" \
     --ftp-pasv \
-    "ftp://$HOST:$PORT/" >/dev/null
+    "$FTP_URL/" >/dev/null
 }
 
-# 3. 本地用户登录（仅测试能否登录）
+test_anon_upload_policy() {
+  local tmp_file target
+  tmp_file="$(mktemp "$TMP_DIR/vsftpd_anon_XXXXXX")"
+  target="anon_upload_test_$$.txt"
+  echo "anon upload test $(date)" >"$tmp_file"
+
+  if [ "$ANON_UPLOAD_ALLOWED" -eq 1 ]; then
+    curl -sS --fail $(curl_tls_args) \
+      --user "anonymous:anonymous@" \
+      --ftp-pasv \
+      -T "$tmp_file" \
+      "$FTP_URL/$target" >/dev/null
+    curl -sS --fail $(curl_tls_args) \
+      --user "anonymous:anonymous@" \
+      --ftp-pasv \
+      --quote "DELE $target" \
+      "$FTP_URL/" >/dev/null
+    rm -f "$tmp_file"
+    return 0
+  fi
+
+  if curl -sS $(curl_tls_args) \
+    --user "anonymous:anonymous@" \
+    --ftp-pasv \
+    -T "$tmp_file" \
+    "$FTP_URL/$target" >/dev/null 2>&1; then
+    echo "Anonymous upload unexpectedly succeeded (set ANON_UPLOAD_ALLOWED=1 if this is intentional)."
+    curl -sS $(curl_tls_args) \
+      --user "anonymous:anonymous@" \
+      --ftp-pasv \
+      --quote "DELE $target" \
+      "$FTP_URL/" >/dev/null 2>&1 || true
+    rm -f "$tmp_file"
+    return 1
+  fi
+
+  rm -f "$tmp_file"
+  return 0
+}
+
 test_local_login() {
-  curl -sS --fail \
+  curl -sS --fail $(curl_tls_args) \
     --user "${LOCAL_USER}:${LOCAL_PASS}" \
     --ftp-pasv \
-    "ftp://$HOST:$PORT/" >/dev/null
+    "$FTP_URL/" >/dev/null
 }
 
-# 4. 本地用户上传 / 下载 / 删除文件（被动模式）
+test_bad_password_rejected() {
+  if curl -sS $(curl_tls_args) \
+    --user "${LOCAL_USER}:wrong-password" \
+    --ftp-pasv \
+    "$FTP_URL/" >/dev/null 2>&1; then
+    echo "Login with bad password unexpectedly succeeded"
+    return 1
+  fi
+  return 0
+}
+
+test_pasv_list() {
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    "$FTP_URL/" >/dev/null
+}
+
+test_active_list() {
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-port - \
+    "$FTP_URL/" >/dev/null
+}
+
 test_local_upload_download_delete_pasv() {
   local test_dir="bsc_test_$$"
   local remote_file="hello_vsftpd.txt"
-  local tmp_file
-  local dl_file
+  local tmp_file dl_file
 
   tmp_file="$(mktemp "$TMP_DIR/vsftpd_test_XXXXXX")"
   dl_file="$(mktemp "$TMP_DIR/vsftpd_dl_XXXXXX")"
 
   echo "This is a test file for vsftpd at $(date)" >"$tmp_file"
 
-  # 创建远程测试目录
-  curl -sS --fail \
+  register_cleanup_dir "$test_dir"
+  curl -sS --fail $(curl_tls_args) \
     --user "${LOCAL_USER}:${LOCAL_PASS}" \
     --ftp-pasv \
     --quote "MKD $test_dir" \
-    "ftp://$HOST:$PORT/" >/dev/null
+    "$FTP_URL/" >/dev/null
 
-  # 上传文件
-  curl -sS --fail \
+  curl -sS --fail $(curl_tls_args) \
     --user "${LOCAL_USER}:${LOCAL_PASS}" \
     --ftp-pasv \
     -T "$tmp_file" \
-    "ftp://$HOST:$PORT/$test_dir/$remote_file" >/dev/null
+    "$FTP_URL/$test_dir/$remote_file" >/dev/null
 
-  # 下载回来
-  curl -sS --fail \
+  curl -sS --fail $(curl_tls_args) \
     --user "${LOCAL_USER}:${LOCAL_PASS}" \
     --ftp-pasv \
-    "ftp://$HOST:$PORT/$test_dir/$remote_file" \
+    "$FTP_URL/$test_dir/$remote_file" \
     -o "$dl_file"
 
-  # 比较文件内容是否一致
   if ! cmp -s "$tmp_file" "$dl_file"; then
-    echo "本地上传文件与下载文件内容不一致！"
+    echo "Uploaded and downloaded file differ"
     rm -f "$tmp_file" "$dl_file"
     return 1
   fi
 
-  # 删除远程文件
-  curl -sS --fail \
+  curl -sS --fail $(curl_tls_args) \
     --user "${LOCAL_USER}:${LOCAL_PASS}" \
     --ftp-pasv \
     --quote "DELE $test_dir/$remote_file" \
-    "ftp://$HOST:$PORT/" >/dev/null
+    "$FTP_URL/" >/dev/null
 
-  # 删除远程目录
-  curl -sS --fail \
+  curl -sS --fail $(curl_tls_args) \
     --user "${LOCAL_USER}:${LOCAL_PASS}" \
     --ftp-pasv \
     --quote "RMD $test_dir" \
-    "ftp://$HOST:$PORT/" >/dev/null
+    "$FTP_URL/" >/dev/null
 
   rm -f "$tmp_file" "$dl_file"
+  return 0
 }
 
-# 5. 被动模式下列目录（确认 PASV 正常）
-test_pasv_list() {
-  curl -sS --fail \
+test_local_rename() {
+  local test_dir="bsc_rename_$$"
+  local src_file="rename_src.txt"
+  local dst_file="rename_dst.txt"
+  local tmp_file dl_file
+
+  tmp_file="$(mktemp "$TMP_DIR/vsftpd_rename_XXXXXX")"
+  dl_file="$(mktemp "$TMP_DIR/vsftpd_rename_dl_XXXXXX")"
+  echo "rename check $(date)" >"$tmp_file"
+  register_cleanup_dir "$test_dir"
+
+  curl -sS --fail $(curl_tls_args) \
     --user "${LOCAL_USER}:${LOCAL_PASS}" \
     --ftp-pasv \
-    "ftp://$HOST:$PORT/" >/dev/null
-}
+    --quote "MKD $test_dir" \
+    "$FTP_URL/" >/dev/null
 
-# 6. 主动模式下列目录（确认 PORT 模式正常）
-test_active_list() {
-  # --ftp-port - 表示让 curl 使用主动模式（PORT）
-  curl -sS --fail \
+  curl -sS --fail $(curl_tls_args) \
     --user "${LOCAL_USER}:${LOCAL_PASS}" \
-    --ftp-port - \
-    "ftp://$HOST:$PORT/" >/dev/null
+    --ftp-pasv \
+    -T "$tmp_file" \
+    "$FTP_URL/$test_dir/$src_file" >/dev/null
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    --quote "RNFR $test_dir/$src_file" \
+    --quote "RNTO $test_dir/$dst_file" \
+    "$FTP_URL/" >/dev/null
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    "$FTP_URL/$test_dir/$dst_file" \
+    -o "$dl_file"
+
+  if ! cmp -s "$tmp_file" "$dl_file"; then
+    echo "Renamed file content mismatch"
+    rm -f "$tmp_file" "$dl_file"
+    return 1
+  fi
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    --quote "DELE $test_dir/$dst_file" \
+    "$FTP_URL/" >/dev/null
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    --quote "RMD $test_dir" \
+    "$FTP_URL/" >/dev/null
+
+  rm -f "$tmp_file" "$dl_file"
+  return 0
+}
+
+test_local_resume_download() {
+  local test_dir="bsc_resume_$$"
+  local remote_file="resume_test.bin"
+  local src_file partial_file full_file
+  src_file="$(mktemp "$TMP_DIR/vsftpd_resume_src_XXXXXX")"
+  partial_file="$(mktemp "$TMP_DIR/vsftpd_resume_part_XXXXXX")"
+  full_file="$(mktemp "$TMP_DIR/vsftpd_resume_full_XXXXXX")"
+
+  mk_payload "$src_file"
+  register_cleanup_dir "$test_dir"
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    --quote "MKD $test_dir" \
+    "$FTP_URL/" >/dev/null
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    -T "$src_file" \
+    "$FTP_URL/$test_dir/$remote_file" >/dev/null
+
+  # Download first 4 KiB then resume to full file.
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    --range 0-4095 \
+    "$FTP_URL/$test_dir/$remote_file" \
+    -o "$partial_file"
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    -C - \
+    "$FTP_URL/$test_dir/$remote_file" \
+    -o "$partial_file"
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    "$FTP_URL/$test_dir/$remote_file" \
+    -o "$full_file"
+
+  if ! cmp -s "$src_file" "$partial_file"; then
+    echo "Resume download produced different file"
+    rm -f "$src_file" "$partial_file" "$full_file"
+    return 1
+  fi
+  if ! cmp -s "$src_file" "$full_file"; then
+    echo "Full download mismatch"
+    rm -f "$src_file" "$partial_file" "$full_file"
+    return 1
+  fi
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    --quote "DELE $test_dir/$remote_file" \
+    "$FTP_URL/" >/dev/null
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    --quote "RMD $test_dir" \
+    "$FTP_URL/" >/dev/null
+
+  rm -f "$src_file" "$partial_file" "$full_file"
+  return 0
+}
+
+test_nested_dirs() {
+  local test_dir="bsc_nested_$$"
+  local nested="$test_dir/sub/child"
+  register_cleanup_dir "$test_dir"
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    --quote "MKD $test_dir" \
+    --quote "MKD $test_dir/sub" \
+    --quote "MKD $nested" \
+    "$FTP_URL/" >/dev/null
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    "$FTP_URL/$nested/" >/dev/null
+
+  curl -sS --fail $(curl_tls_args) \
+    --user "${LOCAL_USER}:${LOCAL_PASS}" \
+    --ftp-pasv \
+    --quote "RMD $nested" \
+    --quote "RMD $test_dir/sub" \
+    --quote "RMD $test_dir" \
+    "$FTP_URL/" >/dev/null
 }
 
 ########################
-# 主流程
+# Main
 ########################
-
 main() {
-  echo "==== vsftpd 功能测试开始 ===="
-  echo "目标服务器：$HOST:$PORT"
-  echo "匿名测试：$([ "$ANON_ENABLED" -eq 1 ] && echo '启用' || echo '关闭')"
-  echo "本地用户：$LOCAL_USER"
+  echo "==== vsftpd functional tests ===="
+  echo "Target: $HOST:$PORT"
+  echo "Anonymous: $ANON_ENABLED (upload allowed: $ANON_UPLOAD_ALLOWED)"
+  echo "Local user: $LOCAL_USER"
+  echo "TLS required: $USE_TLS (insecure cert: $TLS_INSECURE)"
+  echo "Skip active mode: $SKIP_ACTIVE"
   echo
 
   check_dep
 
-  run_test "1. 端口连通性" test_connect_port
+  run_test "1. Port reachable" test_connect_port
 
   if [ "$ANON_ENABLED" -eq 1 ]; then
-    run_test "2. 匿名登录 + 列目录" test_anon_login_list
+    run_test "2. Anonymous login + list" test_anon_login_list
+    run_test "3. Anonymous upload policy" test_anon_upload_policy
   else
-    echo "跳过匿名登录测试（ANON_ENABLED=0）"
+    echo "Skip anonymous tests (ANON_ENABLED=0)"
     echo
   fi
 
   if [ -n "$LOCAL_USER" ]; then
-    run_test "3. 本地用户登录" test_local_login
-    run_test "4. 本地用户上传 / 下载 / 删除（被动模式）" test_local_upload_download_delete_pasv
-    run_test "5. 本地用户被动模式列目录 (PASV)" test_pasv_list
-    run_test "6. 本地用户主动模式列目录 (PORT)" test_active_list
+    run_test "4. Local login (PASV)" test_local_login
+    run_test "5. Bad password rejected" test_bad_password_rejected
+    run_test "6. PASV listing" test_pasv_list
+    if [ "$SKIP_ACTIVE" -eq 0 ]; then
+      run_test "7. PORT listing" test_active_list
+    else
+      echo "Skip active mode test (SKIP_ACTIVE=1)"
+      echo
+    fi
+    run_test "8. Upload / download / delete (PASV)" test_local_upload_download_delete_pasv
+    run_test "9. Rename (RNFR/RNTO)" test_local_rename
+    run_test "10. Resume download (REST)" test_local_resume_download
+    run_test "11. Nested directory create/remove" test_nested_dirs
   else
-    echo "未配置本地用户，跳过本地用户相关测试。"
+    echo "No LOCAL_USER configured, skip local-user tests."
     echo
   fi
 
-  echo "==== 测试结束 ===="
+  echo "==== Done ===="
   if [ "$FAILED" -eq 0 ]; then
-    echo "全部测试通过 ✅"
+    echo "All tests passed."
   else
-    echo "有 $FAILED 项测试失败 ❌ ，请检查 vsftpd 配置和日志。"
+    echo "$FAILED test(s) failed. Check vsftpd config/logs."
   fi
 }
 
