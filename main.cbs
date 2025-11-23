@@ -116,24 +116,36 @@ main(int argc, const char* argv[])
   }
   /* Parse default config file if necessary */
   if (!config_loaded) {
-    struct vsf_sysutil_statbuf* p_statbuf = 0;
-    int retval = vsf_sysutil_stat(VSFTP_DEFAULT_CONFIG, &p_statbuf);
+    struct vsf_sysutil_statbuf* owned p_statbuf =
+      (struct vsf_sysutil_statbuf* owned)(void*)0;
+    struct vsf_sysutil_statbuf** p_statbuf_borrow =
+      (struct vsf_sysutil_statbuf**) &p_statbuf;
+    int retval = vsf_sysutil_stat(VSFTP_DEFAULT_CONFIG, p_statbuf_borrow);
     if (!vsf_sysutil_retval_is_error(retval))
     {
       vsf_parseconf_load_file(VSFTP_DEFAULT_CONFIG, 1);
     }
-    vsf_sysutil_free(p_statbuf);
+    struct vsf_sysutil_statbuf* borrow p_statbuf_free =
+      (struct vsf_sysutil_statbuf* borrow) p_statbuf;
+    vsf_sysutil_free((void*) p_statbuf_free);
   }
   /* Resolve pasv_address if required */
   if (tunable_pasv_address && tunable_pasv_addr_resolve)
   {
-    struct vsf_sysutil_sockaddr* p_addr = 0;
+    struct vsf_sysutil_sockaddr* owned p_addr =
+      (struct vsf_sysutil_sockaddr* owned)(void*)0;
+    struct vsf_sysutil_sockaddr** p_addr_borrow =
+      (struct vsf_sysutil_sockaddr**) &p_addr;
+    struct vsf_sysutil_sockaddr* borrow p_addr_borrow_view =
+      (struct vsf_sysutil_sockaddr* borrow) p_addr;
     const char* p_numeric_addr;
-    vsf_sysutil_dns_resolve(&p_addr, tunable_pasv_address);
+    vsf_sysutil_dns_resolve(p_addr_borrow, tunable_pasv_address);
     vsf_sysutil_free((char*) tunable_pasv_address);
-    p_numeric_addr = vsf_sysutil_inet_ntop(p_addr);
+    const struct vsf_sysutil_sockaddr* p_addr_const =
+      (const struct vsf_sysutil_sockaddr*) p_addr_borrow_view;
+    p_numeric_addr = vsf_sysutil_inet_ntop(p_addr_const);
     tunable_pasv_address = vsf_sysutil_strdup(p_numeric_addr);
-    vsf_sysutil_free(p_addr);
+    vsf_sysutil_free((void*) p_addr_borrow_view);
   }
   if (!tunable_run_as_launching_user)
   {

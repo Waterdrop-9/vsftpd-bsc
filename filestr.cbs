@@ -26,7 +26,7 @@ str_fileread(struct mystr* p_str, const char* p_filename, unsigned int maxsize)
   safe int fd = -1;
   safe int retval = 0;
   safe filesize_t size = 0;
-  char* p_sec_buf = 0;
+  char* owned p_sec_buf = (char* owned)(void*)0;
   char** borrow p_secbuf_borrow =
     (char** borrow) &p_sec_buf;
   struct vsf_sysutil_statbuf* p_stat = 0;
@@ -47,7 +47,9 @@ str_fileread(struct mystr* p_str, const char* p_filename, unsigned int maxsize)
     }
     vsf_secbuf_alloc(p_secbuf_borrow, (unsigned int) size);
 
-    retval = vsf_sysutil_read_loop(fd, p_sec_buf, (unsigned int) size);
+    char* borrow p_sec_buf_borrow = (char* borrow) p_sec_buf;
+    retval = vsf_sysutil_read_loop(fd, (void*) p_sec_buf_borrow,
+                                   (unsigned int) size);
     if (vsf_sysutil_retval_is_error(retval))
     {
       goto free_out;
@@ -56,7 +58,8 @@ str_fileread(struct mystr* p_str, const char* p_filename, unsigned int maxsize)
     {
       die("read size mismatch");
     }
-    str_alloc_memchunk(p_str, p_sec_buf, (unsigned int) size);
+    str_alloc_memchunk(p_str, (const char*) p_sec_buf_borrow,
+                       (unsigned int) size);
   }
 free_out:
   vsf_sysutil_free(p_stat);

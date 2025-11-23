@@ -217,7 +217,8 @@ connect_validator(struct pt_sandbox* borrow p_sandbox, void* p_arg)
   safe unsigned long arg3 = 0;
   safe unsigned long expected_family = AF_INET;
   safe unsigned long expected_len = sizeof(struct sockaddr_in);
-  char* p_buf = 0;
+  char* owned p_buf = (char* owned)(void*)0;
+  char* borrow p_buf_borrow = (char* borrow) p_buf;
   struct sockaddr* p_sockaddr = 0;
   static struct vsf_sysutil_sockaddr* p_sockptr;
   struct pt_sandbox* borrow p_sandbox_borrow =
@@ -245,18 +246,18 @@ connect_validator(struct pt_sandbox* borrow p_sandbox, void* p_arg)
   {
     return -1;
   }
-  p_buf = vsf_sysutil_malloc((int) expected_len);
-  char* borrow p_buf_borrow = (char* borrow) p_buf;
+  p_buf = (char* owned) vsf_sysutil_malloc((int) expected_len);
+  p_buf_borrow = (char* borrow) p_buf;
   ret = ptrace_sandbox_get_buf(p_sandbox_borrow, arg2, expected_len, p_buf_borrow);
   if (ret != 0)
   {
-    vsf_sysutil_free(p_buf);
+    vsf_sysutil_free((void*) p_buf_borrow);
     return -2;
   }
-  p_sockaddr = (struct sockaddr*) p_buf;
+  p_sockaddr = (struct sockaddr*) (void*) p_buf_borrow;
   if (p_sockaddr->sa_family != expected_family)
   {
-    vsf_sysutil_free(p_buf);
+    vsf_sysutil_free((void*) p_buf_borrow);
     return -3;
   }
   if (expected_family == AF_INET)
@@ -277,10 +278,10 @@ connect_validator(struct pt_sandbox* borrow p_sandbox, void* p_arg)
   }
   if (!vsf_sysutil_sockaddr_addr_equal(p_sess->p_remote_addr, p_sockptr))
   {
-    vsf_sysutil_free(p_buf);
+    vsf_sysutil_free((void*) p_buf_borrow);
     return -4;
   }
-  vsf_sysutil_free(p_buf);
+  vsf_sysutil_free((void*) p_buf_borrow);
   return 0;
 }
 
